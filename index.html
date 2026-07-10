@@ -4,311 +4,107 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Almacén</title>
+    
+    <!-- Carga de Tailwind CSS para el diseño -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Carga de Phosphor Icons (Alternativa a Lucide para HTML puro) -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <!-- Estilos específicos para animaciones y el formato de impresión -->
     <style>
-        /* Estilos personalizados, incluyendo la lógica de impresión */
-        body { font-family: 'Inter', sans-serif; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; animation: fadeIn 0.3s ease-in-out; }
-        
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
+            from { opacity: 0; transform: translateY(5px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Estilos para el ticket de impresión */
+        /* Estilos de impresión para el Vale de Salida */
         @media print {
-            body * { visibility: hidden; }
-            #printable-receipt, #printable-receipt * { visibility: visible; }
-            #printable-receipt {
+            body * {
+                visibility: hidden;
+            }
+            #receipt-modal, #receipt-modal * {
+                visibility: visible;
+            }
+            #receipt-modal {
                 position: absolute;
                 left: 0;
                 top: 0;
                 width: 100%;
                 padding: 20px;
+                background-color: white !important;
+                box-shadow: none !important;
             }
-            .no-print { display: none !important; }
+            .no-print {
+                display: none !important;
+            }
         }
     </style>
 </head>
-<body class="bg-slate-50 flex flex-col md:flex-row min-h-screen text-slate-800">
+<body class="bg-slate-50 font-sans text-slate-800">
 
-    <aside class="w-full md:w-64 bg-gray-900 text-gray-300 flex flex-col shrink-0 no-print transition-all duration-300 z-20">
-        <div class="p-6 border-b border-gray-800 flex justify-between items-center md:block">
-            <h1 class="text-xl font-bold text-white flex items-center">
-                <i data-lucide="package" class="mr-2 text-emerald-500"></i>
-                Sistema de Almacén
-            </h1>
-            <!-- Botón menú móvil -->
-            <button id="mobile-menu-btn" class="md:hidden text-gray-300 hover:text-white">
-                <i data-lucide="menu"></i>
-            </button>
-        </div>
+    <div class="min-h-screen flex flex-col md:flex-row">
         
-        <nav id="sidebar-nav" class="flex-1 py-4 hidden md:block">
-            <ul class="space-y-1 px-3">
-                <li>
-                    <button onclick="switchTab('dashboard')" id="btn-dashboard" class="nav-btn w-full flex items-center px-4 py-3 rounded-lg transition-all duration-300 bg-emerald-600 text-white shadow-lg shadow-emerald-600/40">
-                        <i data-lucide="layout-dashboard" class="mr-3 w-5 h-5"></i> Dashboard
-                    </button>
-                </li>
-                <li>
-                    <button onclick="switchTab('inventory')" id="btn-inventory" class="nav-btn w-full flex items-center px-4 py-3 rounded-lg transition-all duration-300 hover:bg-gray-800 hover:text-white">
-                        <i data-lucide="search" class="mr-3 w-5 h-5"></i> Inventario
-                    </button>
-                </li>
-                <li>
-                    <button onclick="switchTab('in')" id="btn-in" class="nav-btn w-full flex items-center px-4 py-3 rounded-lg transition-all duration-300 hover:bg-gray-800 hover:text-white">
-                        <i data-lucide="arrow-down-to-line" class="mr-3 w-5 h-5"></i> Entradas
-                    </button>
-                </li>
-                <li>
-                    <button onclick="switchTab('out')" id="btn-out" class="nav-btn w-full flex items-center px-4 py-3 rounded-lg transition-all duration-300 hover:bg-gray-800 hover:text-white">
-                        <i data-lucide="arrow-up-from-line" class="mr-3 w-5 h-5"></i> Salidas
-                    </button>
-                </li>
-            </ul>
-        </nav>
-    </aside>
-
-    <main class="flex-1 p-6 md:p-8 overflow-y-auto no-print relative">
-        <!-- Notificaciones (Toast) -->
-        <div id="feedback-msg" class="hidden mb-6 p-4 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg items-center transition-opacity duration-300 opacity-0">
-            <i data-lucide="alert-triangle" class="mr-2 w-5 h-5"></i>
-            <span id="feedback-text">Mensaje</span>
-        </div>
-
-        <div id="tab-dashboard" class="tab-content active space-y-6">
-            <h2 class="text-2xl font-bold text-slate-800">Resumen Operativo</h2>
-            
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center space-x-4">
-                    <div class="p-3 bg-blue-100 text-blue-600 rounded-lg">
-                        <i data-lucide="package" class="w-6 h-6"></i>
-                    </div>
-                    <div>
-                        <p class="text-sm text-slate-500 font-medium">Total SKUs</p>
-                        <p id="stat-skus" class="text-2xl font-bold text-slate-800">0</p>
-                    </div>
-                </div>
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center space-x-4">
-                    <div class="p-3 bg-emerald-100 text-emerald-600 rounded-lg">
-                        <i data-lucide="arrow-down-to-line" class="w-6 h-6"></i>
-                    </div>
-                    <div>
-                        <p class="text-sm text-slate-500 font-medium">Entradas</p>
-                        <p id="stat-in" class="text-2xl font-bold text-slate-800">0</p>
-                    </div>
-                </div>
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center space-x-4 sm:col-span-2 md:col-span-1">
-                    <div class="p-3 bg-rose-100 text-rose-600 rounded-lg">
-                        <i data-lucide="arrow-up-from-line" class="w-6 h-6"></i>
-                    </div>
-                    <div>
-                        <p class="text-sm text-slate-500 font-medium">Salidas</p>
-                        <p id="stat-out" class="text-2xl font-bold text-slate-800">0</p>
-                    </div>
-                </div>
+        <!-- Sidebar Navigation -->
+        <aside class="w-full md:w-64 bg-gray-900 text-gray-300 flex flex-col shrink-0 no-print shadow-xl z-10">
+            <div class="p-6 border-b border-gray-800">
+                <h1 class="text-xl font-bold text-white flex items-center">
+                    <i class="ph-fill ph-package text-emerald-500 mr-2 text-2xl"></i>
+                    Sistema de Almacén
+                </h1>
             </div>
-
-            <!-- Tabla Alertas de Stock Bajo -->
-            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 overflow-hidden">
-                <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center">
-                    <i data-lucide="alert-triangle" class="text-amber-500 mr-2 w-5 h-5"></i> Alertas de Stock Bajo
-                </h3>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse min-w-[500px]">
-                        <thead>
-                            <tr class="border-b border-slate-200 text-sm text-slate-500">
-                                <th class="pb-3 font-medium">SKU</th>
-                                <th class="pb-3 font-medium">Refacción</th>
-                                <th class="pb-3 font-medium">Ubicación</th>
-                                <th class="pb-3 font-medium text-right">Stock</th>
-                                <th class="pb-3 font-medium text-right">Mínimo</th>
-                            </tr>
-                        </thead>
-                        <tbody id="low-stock-table-body" class="text-sm">
-                            <!-- Se llena por JS -->
-                        </tbody>
-                    </table>
-                </div>
-                <p id="low-stock-empty" class="text-slate-500 text-sm hidden mt-4 text-center">Todo el inventario está en niveles óptimos.</p>
-            </div>
-        </div>
-
-        <div id="tab-inventory" class="tab-content space-y-6">
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <h2 class="text-2xl font-bold text-slate-800">Catálogo e Inventario</h2>
-                <div class="relative w-full sm:w-64">
-                    <i data-lucide="search" class="absolute left-3 top-2.5 text-slate-400 w-4 h-4"></i>
-                    <input type="text" id="search-input" placeholder="Buscar pieza o SKU..." class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                </div>
-            </div>
-
-            <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse min-w-[600px]">
-                        <thead class="bg-slate-50">
-                            <tr class="border-b border-slate-200 text-sm text-slate-600">
-                                <th class="p-4 font-medium">SKU</th>
-                                <th class="p-4 font-medium">Descripción</th>
-                                <th class="p-4 font-medium">Ubicación</th>
-                                <th class="p-4 font-medium text-right">Mínimo</th>
-                                <th class="p-4 font-medium text-right">Stock</th>
-                                <th class="p-4 font-medium text-center">Estado</th>
-                            </tr>
-                        </thead>
-                        <tbody id="inventory-table-body" class="text-sm">
-                            <!-- Se llena por JS -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Formulario Nueva Refacción -->
-            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 mt-8">
-                <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center">
-                    <i data-lucide="plus" class="text-blue-500 mr-2 w-5 h-5"></i> Registrar Nueva Refacción
-                </h3>
-                <form id="form-new-part" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div>
-                        <label class="block text-xs font-medium text-slate-500 mb-1">SKU / Código</label>
-                        <input required type="text" id="new-sku" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ej. LUB-001">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-500 mb-1">Descripción</label>
-                        <input required type="text" id="new-name" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Nombre de la pieza">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-500 mb-1">Ubicación</label>
-                        <input type="text" id="new-location" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Pasillo, Anaquel...">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-500 mb-1">Stock Mínimo</label>
-                        <input required type="number" min="0" id="new-minstock" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Ej. 5">
-                    </div>
-                    <div class="lg:col-span-4 flex justify-end mt-2">
-                        <button type="submit" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
-                            Agregar al Catálogo
+            <nav class="flex-1 py-4">
+                <ul class="space-y-1 px-3">
+                    <li>
+                        <button onclick="navigate('dashboard')" id="nav-dashboard" class="nav-btn w-full flex items-center px-4 py-3 rounded-lg transition-all duration-300">
+                            <i class="ph ph-squares-four mr-3 text-xl"></i> Dashboard
                         </button>
-                    </div>
-                </form>
-            </div>
-        </div>
+                    </li>
+                    <li>
+                        <button onclick="navigate('inventory')" id="nav-inventory" class="nav-btn w-full flex items-center px-4 py-3 rounded-lg transition-all duration-300">
+                            <i class="ph ph-magnifying-glass mr-3 text-xl"></i> Inventario
+                        </button>
+                    </li>
+                    <li>
+                        <button onclick="navigate('in')" id="nav-in" class="nav-btn w-full flex items-center px-4 py-3 rounded-lg transition-all duration-300">
+                            <i class="ph ph-download-simple mr-3 text-xl"></i> Entradas
+                        </button>
+                    </li>
+                    <li>
+                        <button onclick="navigate('out')" id="nav-out" class="nav-btn w-full flex items-center px-4 py-3 rounded-lg transition-all duration-300">
+                            <i class="ph ph-upload-simple mr-3 text-xl"></i> Salidas
+                        </button>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
 
-        <div id="tab-in" class="tab-content">
-            <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-sm border border-slate-100 p-6 md:p-8">
-                <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center">
-                    <i data-lucide="arrow-down-to-line" class="text-emerald-500 mr-2 w-6 h-6"></i> Entrada de Refacciones
-                </h2>
-                <form id="form-in" class="space-y-5">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Seleccionar Refacción</label>
-                        <select required id="in-part" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none">
-                            <option value="">-- Seleccione una pieza --</option>
-                        </select>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Cantidad</label>
-                            <input required type="number" min="1" id="in-qty" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="0">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Referencia (Factura)</label>
-                            <input required type="text" id="in-ref" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Ej. Factura A-123">
-                        </div>
-                    </div>
-                    <div class="pt-4 border-t border-slate-100">
-                        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-lg font-medium transition-colors">Registrar Entrada</button>
-                    </div>
-                </form>
+        <!-- Main Content Area -->
+        <main class="flex-1 p-6 md:p-8 overflow-y-auto no-print relative">
+            <!-- Toast Notification -->
+            <div id="toast" class="hidden absolute top-4 right-8 bg-blue-50 border border-blue-200 text-blue-700 p-4 rounded-lg flex items-center shadow-md animate-fade-in z-50">
+                <i class="ph-fill ph-warning mr-2 text-xl"></i>
+                <span id="toast-message">Mensaje</span>
             </div>
-        </div>
 
-        <div id="tab-out" class="tab-content">
-            <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-sm border border-slate-100 p-6 md:p-8">
-                <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center">
-                    <i data-lucide="arrow-up-from-line" class="text-rose-500 mr-2 w-6 h-6"></i> Salida de Refacciones
-                </h2>
-                <form id="form-out" class="space-y-5">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Seleccionar Refacción</label>
-                        <select required id="out-part" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 outline-none">
-                            <option value="">-- Seleccione una pieza --</option>
-                        </select>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Cantidad</label>
-                            <input required type="number" min="1" id="out-qty" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 outline-none" placeholder="0">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Asignado a</label>
-                            <input required type="text" id="out-ref" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-rose-500 outline-none" placeholder="Ej. Camión 45">
-                        </div>
-                    </div>
-                    <div class="pt-4 border-t border-slate-100">
-                        <button type="submit" class="w-full bg-rose-600 hover:bg-rose-700 text-white px-6 py-3 rounded-lg font-medium transition-colors">Registrar Salida</button>
-                    </div>
-                </form>
+            <div id="app-content">
+                <!-- El contenido dinámico se inyectará aquí mediante JavaScript -->
             </div>
-        </div>
-    </main>
+        </main>
 
-    <div id="receipt-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 hidden">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
-            <!-- Contenido Imprimible -->
-            <div id="printable-receipt" class="p-8 bg-white overflow-y-auto">
-                <div class="text-center mb-8 border-b-2 border-slate-800 pb-6">
-                    <h2 class="text-2xl font-black text-slate-800 uppercase tracking-widest">Vale de Salida</h2>
-                    <p class="text-slate-500 text-sm mt-2">Folio: <span id="rec-folio" class="font-bold text-slate-700"></span></p>
-                    <p class="text-slate-500 text-sm">Fecha: <span id="rec-date" class="font-medium text-slate-700"></span></p>
-                </div>
-                <div class="space-y-4 mb-10">
-                    <div class="flex justify-between items-end border-b border-slate-200 pb-2">
-                        <span class="text-slate-500 text-sm uppercase tracking-wider font-semibold">SKU</span>
-                        <span id="rec-sku" class="text-slate-800 font-bold"></span>
-                    </div>
-                    <div class="flex justify-between items-end border-b border-slate-200 pb-2">
-                        <span class="text-slate-500 text-sm uppercase tracking-wider font-semibold">Descripción</span>
-                        <span id="rec-name" class="text-slate-800 text-right max-w-[60%]"></span>
-                    </div>
-                    <div class="flex justify-between items-end border-b border-slate-200 pb-2">
-                        <span class="text-slate-500 text-sm uppercase tracking-wider font-semibold">Cantidad</span>
-                        <span class="text-2xl font-black text-slate-800"><span id="rec-qty"></span> <span class="text-sm font-normal text-slate-500">unids</span></span>
-                    </div>
-                    <div class="flex justify-between items-end border-b border-slate-200 pb-2">
-                        <span class="text-slate-500 text-sm uppercase tracking-wider font-semibold">Destino</span>
-                        <span id="rec-ref" class="text-slate-800 font-medium text-right max-w-[60%] bg-slate-100 px-2 py-1 rounded"></span>
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-8 mt-16 pt-4">
-                    <div class="text-center">
-                        <div class="border-b border-slate-800 h-10 mb-2"></div>
-                        <p class="text-xs text-slate-600 font-bold uppercase tracking-wider">Entregó (Almacén)</p>
-                    </div>
-                    <div class="text-center">
-                        <div class="border-b border-slate-800 h-10 mb-2"></div>
-                        <p class="text-xs text-slate-600 font-bold uppercase tracking-wider">Recibió</p>
-                    </div>
-                </div>
-            </div>
-            <!-- Botones No Imprimibles -->
-            <div class="bg-slate-50 p-4 flex justify-end space-x-3 border-t border-slate-200 no-print shrink-0">
-                <button onclick="closeReceipt()" class="px-5 py-2.5 text-slate-600 font-medium hover:bg-slate-200 rounded-lg">Cerrar</button>
-                <button onclick="window.print()" class="px-5 py-2.5 bg-slate-800 text-white font-medium hover:bg-slate-900 rounded-lg flex items-center">
-                    <i data-lucide="printer" class="w-4 h-4 mr-2"></i> Imprimir
-                </button>
+        <!-- Contenedor del Vale de Salida (Oculto por defecto) -->
+        <div id="receipt-container" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
+            <div id="receipt-modal" class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+                <!-- El contenido del recibo se inyecta aquí -->
             </div>
         </div>
     </div>
 
     <script>
-        // Inicializar iconos de Lucide
-        lucide.createIcons();
-
-        // Datos Iniciales
+        // --- ESTADO INICIAL (Datos de prueba) ---
         let parts = [
             { id: 'p1', sku: 'FIL-001', name: 'Filtro de Aceite Sintético', location: 'Pasillo 1, Anaquel A1', minStock: 10 },
             { id: 'p2', sku: 'BAL-023', name: 'Balatas Delanteras', location: 'Pasillo 2, Anaquel B3', minStock: 5 },
@@ -320,208 +116,479 @@
             { id: 't1', date: '2023-10-24T10:00:00', partId: 'p1', type: 'IN', qty: 50, reference: 'Factura 1092' },
             { id: 't2', date: '2023-10-25T11:30:00', partId: 'p2', type: 'IN', qty: 20, reference: 'Factura 1093' },
             { id: 't3', date: '2023-10-26T09:15:00', partId: 'p3', type: 'IN', qty: 100, reference: 'Factura 1094' },
-            { id: 't4', date: '2023-10-26T14:00:00', partId: 'p1', type: 'OUT', qty: 4, reference: 'Unidad 45' },
-            { id: 't5', date: '2023-10-27T08:30:00', partId: 'p2', type: 'OUT', qty: 16, reference: 'Unidad 12' },
+            { id: 't4', date: '2023-10-26T14:00:00', partId: 'p1', type: 'OUT', qty: 4, reference: 'Unidad 45 (Mantenimiento)' },
+            { id: 't5', date: '2023-10-27T08:30:00', partId: 'p2', type: 'OUT', qty: 16, reference: 'Unidad 12 (Reparación)' },
         ];
 
-        // Calcular estado de inventario
+        let activeTab = 'dashboard';
+        let searchTerm = '';
+        let receiptData = null;
+
+        // --- LÓGICA CENTRAL ---
+
+        // Función para calcular el inventario actual basado en las transacciones
         function getInventoryStatus() {
             return parts.map(part => {
-                const partTxs = transactions.filter(t => t.partId === part.id);
-                const currentStock = partTxs.reduce((total, t) => t.type === 'IN' ? total + t.qty : total - t.qty, 0);
-                return { ...part, currentStock, status: currentStock <= part.minStock ? 'low' : 'ok' };
-            });
-        }
-
-        function updateUI() {
-            const inventory = getInventoryStatus();
-            
-            // Dashboard Stats
-            document.getElementById('stat-skus').innerText = parts.length;
-            document.getElementById('stat-in').innerText = transactions.filter(t => t.type === 'IN').length;
-            document.getElementById('stat-out').innerText = transactions.filter(t => t.type === 'OUT').length;
-
-            // Alertas
-            const lowStock = inventory.filter(p => p.status === 'low');
-            const tbodyLow = document.getElementById('low-stock-table-body');
-            const msgEmptyLow = document.getElementById('low-stock-empty');
-            
-            tbodyLow.innerHTML = '';
-            if(lowStock.length === 0) {
-                msgEmptyLow.classList.remove('hidden');
-                tbodyLow.parentElement.classList.add('hidden');
-            } else {
-                msgEmptyLow.classList.add('hidden');
-                tbodyLow.parentElement.classList.remove('hidden');
-                lowStock.forEach(p => {
-                    tbodyLow.innerHTML += `
-                        <tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                            <td class="py-3 font-medium text-slate-700">${p.sku}</td>
-                            <td class="py-3 text-slate-600">${p.name}</td>
-                            <td class="py-3 text-slate-500 text-xs">${p.location}</td>
-                            <td class="py-3 text-right font-bold text-rose-600">${p.currentStock}</td>
-                            <td class="py-3 text-right text-slate-500">${p.minStock}</td>
-                        </tr>`;
-                });
-            }
-
-            // Selects (Entradas/Salidas)
-            const selIn = document.getElementById('in-part');
-            const selOut = document.getElementById('out-part');
-            selIn.innerHTML = '<option value="">-- Seleccione una pieza --</option>';
-            selOut.innerHTML = '<option value="">-- Seleccione una pieza --</option>';
-            
-            inventory.forEach(p => {
-                const opt = `<option value="${p.id}">${p.sku} - ${p.name} (Stock: ${p.currentStock})</option>`;
-                selIn.innerHTML += opt;
-                selOut.innerHTML += opt;
-            });
-
-            renderInventoryTable();
-        }
-
-        function renderInventoryTable(searchTerm = '') {
-            const inventory = getInventoryStatus();
-            const tbody = document.getElementById('inventory-table-body');
-            tbody.innerHTML = '';
-            
-            const filtered = inventory.filter(p => 
-                p.name.toLowerCase().includes(searchTerm) || p.sku.toLowerCase().includes(searchTerm)
-            );
-
-            if(filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-500">No se encontraron refacciones.</td></tr>`;
-                return;
-            }
-
-            filtered.forEach(p => {
-                const badgeClass = p.status === 'ok' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700';
-                const badgeText = p.status === 'ok' ? 'Óptimo' : 'Bajo';
+                const partTransactions = transactions.filter(t => t.partId === part.id);
+                const currentStock = partTransactions.reduce((total, t) => {
+                    return t.type === 'IN' ? total + t.qty : total - t.qty;
+                }, 0);
                 
-                tbody.innerHTML += `
-                    <tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
-                        <td class="p-4 font-medium text-slate-800">${p.sku}</td>
-                        <td class="p-4 text-slate-600">${p.name}</td>
-                        <td class="p-4 text-slate-500">${p.location}</td>
-                        <td class="p-4 text-right text-slate-500">${p.minStock}</td>
-                        <td class="p-4 text-right font-bold text-slate-800">${p.currentStock}</td>
-                        <td class="p-4 text-center">
-                            <span class="inline-block px-2 py-1 rounded-full text-xs font-medium ${badgeClass}">${badgeText}</span>
-                        </td>
-                    </tr>`;
+                return {
+                    ...part,
+                    currentStock,
+                    status: currentStock <= part.minStock ? 'low' : 'ok'
+                };
             });
         }
 
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.getElementById(`tab-${tabId}`).classList.add('active');
-            
-            document.querySelectorAll('.nav-btn').forEach(btn => {
-                btn.className = 'nav-btn w-full flex items-center px-4 py-3 rounded-lg transition-all duration-300 hover:bg-gray-800 hover:text-white';
-            });
-            const activeBtn = document.getElementById(`btn-${tabId}`);
-            activeBtn.className = 'nav-btn w-full flex items-center px-4 py-3 rounded-lg transition-all duration-300 bg-emerald-600 text-white shadow-lg shadow-emerald-600/40';
-            
-            // Cerrar menú móvil al hacer click
-            const nav = document.getElementById('sidebar-nav');
-            if(window.innerWidth < 768 && !nav.classList.contains('hidden')) {
-                nav.classList.add('hidden');
-            }
-        }
-
+        // Mostrar notificaciones en pantalla
         function showFeedback(msg) {
-            const fb = document.getElementById('feedback-msg');
-            document.getElementById('feedback-text').innerText = msg;
-            fb.classList.remove('hidden');
-            setTimeout(() => fb.classList.add('opacity-100'), 10);
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-message');
+            toastMsg.textContent = msg;
+            toast.classList.remove('hidden');
             
             setTimeout(() => {
-                fb.classList.remove('opacity-100');
-                setTimeout(() => fb.classList.add('hidden'), 300);
+                toast.classList.add('hidden');
             }, 3000);
         }
 
-        // Búsqueda en inventario
-        document.getElementById('search-input').addEventListener('input', (e) => {
-            renderInventoryTable(e.target.value.toLowerCase());
-        });
+        // Navegación entre pestañas
+        function navigate(tab) {
+            activeTab = tab;
+            
+            // Actualizar clases de los botones del menú lateral
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.className = 'nav-btn w-full flex items-center px-4 py-3 rounded-lg transition-all duration-300 hover:bg-gray-800 hover:text-white';
+            });
+            
+            const activeBtn = document.getElementById(`nav-${tab}`);
+            if (activeBtn) {
+                activeBtn.className = 'nav-btn w-full flex items-center px-4 py-3 rounded-lg transition-all duration-300 bg-emerald-600 text-white shadow-lg shadow-emerald-600/40';
+            }
 
-        // Menú móvil
-        document.getElementById('mobile-menu-btn').addEventListener('click', () => {
-            document.getElementById('sidebar-nav').classList.toggle('hidden');
-        });
+            renderContent();
+        }
 
-        document.getElementById('form-new-part').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const part = {
+        // Exportar a CSV (Excel)
+        function handleExportCSV() {
+            const inventory = getInventoryStatus();
+            const headers = ['SKU', 'Descripción', 'Ubicación', 'Stock Mínimo', 'Stock Actual', 'Estado'];
+            
+            const csvRows = inventory.map(item => [
+                item.sku,
+                `"${item.name}"`, 
+                `"${item.location}"`,
+                item.minStock,
+                item.currentStock,
+                item.status === 'ok' ? 'Óptimo' : 'Bajo'
+            ]);
+            
+            const csvContent = "\uFEFF" + [headers.join(','), ...csvRows.map(row => row.join(','))].join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            
+            link.setAttribute('href', url);
+            link.setAttribute('download', `Inventario_Almacen_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showFeedback('Hoja de cálculo generada y descargada exitosamente.');
+        }
+
+        // Agregar nueva refacción
+        function handleAddPart(event) {
+            event.preventDefault();
+            const sku = document.getElementById('new-sku').value;
+            const name = document.getElementById('new-name').value;
+            const location = document.getElementById('new-location').value;
+            const minStock = document.getElementById('new-min-stock').value;
+
+            if (!sku || !name) return;
+
+            parts.push({
                 id: 'p' + Date.now(),
-                sku: document.getElementById('new-sku').value,
-                name: document.getElementById('new-name').value,
-                location: document.getElementById('new-location').value,
-                minStock: parseInt(document.getElementById('new-minstock').value) || 0
-            };
-            parts.push(part);
-            e.target.reset();
-            updateUI();
-            showFeedback('Refacción agregada exitosamente.');
-        });
+                sku,
+                name,
+                location,
+                minStock: parseInt(minStock) || 0
+            });
 
-        function handleTransaction(e, type) {
-            e.preventDefault();
-            const prefix = type === 'IN' ? 'in' : 'out';
-            const partId = document.getElementById(`${prefix}-part`).value;
-            const qty = parseInt(document.getElementById(`${prefix}-qty`).value);
-            const ref = document.getElementById(`${prefix}-ref`).value;
+            showFeedback('Refacción agregada al catálogo exitosamente.');
+            renderContent(); // Recargar la vista
+        }
 
-            if(qty <= 0) return showFeedback('La cantidad debe ser mayor a 0.');
+        // Búsqueda en el inventario
+        function handleSearch(event) {
+            searchTerm = event.target.value.toLowerCase();
+            renderContent(); // Podría optimizarse, pero para piloto está bien
+        }
+
+        // Registrar Transacción (Entrada/Salida)
+        function handleTransaction(event, type) {
+            event.preventDefault();
+            const partId = document.getElementById('trans-part').value;
+            const qtyInput = document.getElementById('trans-qty').value;
+            const reference = document.getElementById('trans-ref').value;
+
+            if (!partId || !qtyInput) return;
+
+            const qty = parseInt(qtyInput);
+            if (qty <= 0) {
+                showFeedback('La cantidad debe ser mayor a 0.');
+                return;
+            }
 
             const inventory = getInventoryStatus();
             const partStatus = inventory.find(p => p.id === partId);
 
-            if (type === 'OUT' && partStatus.currentStock < qty) {
-                return showFeedback('Error: No hay suficiente stock para esta salida.');
+            if (type === 'OUT') {
+                if (partStatus && partStatus.currentStock < qty) {
+                    showFeedback('Error: No hay suficiente stock para esta salida.');
+                    return;
+                }
             }
 
             const transaction = {
                 id: 't' + Date.now(),
                 date: new Date().toISOString(),
-                partId, type, qty, reference: ref
+                partId: partId,
+                type: type,
+                qty: qty,
+                reference: reference
             };
 
             transactions.push(transaction);
-            e.target.reset();
-            updateUI();
-            showFeedback(type === 'IN' ? 'Entrada registrada.' : 'Salida registrada exitosamente.');
-
-            if(type === 'OUT') {
-                showReceipt(transaction, partStatus);
+            
+            if (type === 'IN') {
+                showFeedback('Entrada registrada exitosamente.');
+                navigate('in'); // Limpiar formulario
+            } else {
+                showFeedback('Salida registrada exitosamente.');
+                // Preparar e imprimir recibo
+                receiptData = {
+                    ...transaction,
+                    partSku: partStatus.sku,
+                    partName: partStatus.name
+                };
+                renderReceiptModal();
             }
         }
 
-        document.getElementById('form-in').addEventListener('submit', (e) => handleTransaction(e, 'IN'));
-        document.getElementById('form-out').addEventListener('submit', (e) => handleTransaction(e, 'OUT'));
+        // --- FUNCIONES DE RENDERIZADO (Dibujar en pantalla) ---
 
-        function showReceipt(tx, part) {
-            const date = new Date(tx.date).toLocaleString('es-MX', {
-                year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
-            });
-            
-            document.getElementById('rec-folio').innerText = tx.id;
-            document.getElementById('rec-date').innerText = date;
-            document.getElementById('rec-sku').innerText = part.sku;
-            document.getElementById('rec-name').innerText = part.name;
-            document.getElementById('rec-qty').innerText = tx.qty;
-            document.getElementById('rec-ref').innerText = tx.reference;
-            
-            document.getElementById('receipt-modal').classList.remove('hidden');
+        function renderDashboard() {
+            const inventory = getInventoryStatus();
+            const lowStockItems = inventory.filter(item => item.status === 'low');
+            const totalIn = transactions.filter(t => t.type === 'IN').length;
+            const totalOut = transactions.filter(t => t.type === 'OUT').length;
+
+            let lowStockHtml = '';
+            if (lowStockItems.length === 0) {
+                lowStockHtml = `<p class="text-slate-500 text-sm">Todo el inventario está en niveles óptimos.</p>`;
+            } else {
+                let rows = lowStockItems.map(item => `
+                    <tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                        <td class="py-3 font-medium text-slate-700">${item.sku}</td>
+                        <td class="py-3 text-slate-600">${item.name}</td>
+                        <td class="py-3 text-slate-500 text-xs flex items-center">
+                            <i class="ph ph-map-pin mr-1"></i>${item.location}
+                        </td>
+                        <td class="py-3 text-right font-bold text-rose-600">${item.currentStock}</td>
+                        <td class="py-3 text-right text-slate-500">${item.minStock}</td>
+                    </tr>
+                `).join('');
+
+                lowStockHtml = `
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-200 text-sm text-slate-500">
+                                    <th class="pb-3 font-medium">SKU</th>
+                                    <th class="pb-3 font-medium">Refacción</th>
+                                    <th class="pb-3 font-medium">Ubicación</th>
+                                    <th class="pb-3 font-medium text-right">Stock Actual</th>
+                                    <th class="pb-3 font-medium text-right">Mínimo</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">${rows}</tbody>
+                        </table>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="space-y-6 animate-fade-in">
+                    <h2 class="text-2xl font-bold text-slate-800">Resumen Operativo</h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center space-x-4">
+                            <div class="p-3 bg-blue-100 text-blue-600 rounded-lg"><i class="ph ph-package text-2xl"></i></div>
+                            <div>
+                                <p class="text-sm text-slate-500 font-medium">Total SKUs</p>
+                                <p class="text-2xl font-bold text-slate-800">${parts.length}</p>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center space-x-4">
+                            <div class="p-3 bg-emerald-100 text-emerald-600 rounded-lg"><i class="ph ph-download-simple text-2xl"></i></div>
+                            <div>
+                                <p class="text-sm text-slate-500 font-medium">Entradas Registradas</p>
+                                <p class="text-2xl font-bold text-slate-800">${totalIn}</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center space-x-4">
+                            <div class="p-3 bg-rose-100 text-rose-600 rounded-lg"><i class="ph ph-upload-simple text-2xl"></i></div>
+                            <div>
+                                <p class="text-sm text-slate-500 font-medium">Salidas Registradas</p>
+                                <p class="text-2xl font-bold text-slate-800">${totalOut}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+                        <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center">
+                            <i class="ph-fill ph-warning text-amber-500 mr-2 text-xl"></i>
+                            Alertas de Stock Bajo
+                        </h3>
+                        ${lowStockHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderInventory() {
+            const inventory = getInventoryStatus();
+            const filteredInventory = inventory.filter(item => 
+                item.name.toLowerCase().includes(searchTerm) || 
+                item.sku.toLowerCase().includes(searchTerm)
+            );
+
+            let rows = filteredInventory.map(item => `
+                <tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
+                    <td class="p-4 font-medium text-slate-800">${item.sku}</td>
+                    <td class="p-4 text-slate-600">${item.name}</td>
+                    <td class="p-4 text-slate-500">${item.location}</td>
+                    <td class="p-4 text-right text-slate-500">${item.minStock}</td>
+                    <td class="p-4 text-right font-bold text-slate-800">${item.currentStock}</td>
+                    <td class="p-4 text-center">
+                        <span class="inline-block px-2 py-1 rounded-full text-xs font-medium ${
+                            item.status === 'ok' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                        }">
+                            ${item.status === 'ok' ? 'Óptimo' : 'Bajo'}
+                        </span>
+                    </td>
+                </tr>
+            `).join('');
+
+            if (filteredInventory.length === 0) {
+                rows = `<tr><td colSpan="6" class="p-8 text-center text-slate-500">No se encontraron refacciones.</td></tr>`;
+            }
+
+            return `
+                <div class="space-y-6 animate-fade-in">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <h2 class="text-2xl font-bold text-slate-800">Catálogo e Inventario</h2>
+                        <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                            <div class="relative w-full sm:w-64">
+                                <i class="ph ph-magnifying-glass absolute left-3 top-3 text-slate-400"></i>
+                                <input type="text" placeholder="Buscar pieza o SKU..." value="${searchTerm}" onkeyup="handleSearch(event)"
+                                    class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all" />
+                            </div>
+                            <button onclick="handleExportCSV()" class="flex items-center justify-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors font-medium text-sm shadow-sm whitespace-nowrap">
+                                <i class="ph ph-file-csv mr-2 text-lg"></i> Descargar Excel
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead class="bg-slate-50">
+                                    <tr class="border-b border-slate-200 text-sm text-slate-600">
+                                        <th class="p-4 font-medium">SKU</th>
+                                        <th class="p-4 font-medium">Descripción</th>
+                                        <th class="p-4 font-medium">Ubicación</th>
+                                        <th class="p-4 font-medium text-right">Mínimo</th>
+                                        <th class="p-4 font-medium text-right">Stock Actual</th>
+                                        <th class="p-4 font-medium text-center">Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="text-sm">${rows}</tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 mt-8">
+                        <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center">
+                            <i class="ph-bold ph-plus text-blue-500 mr-2 text-xl"></i> Registrar Nueva Refacción
+                        </h3>
+                        <form onsubmit="handleAddPart(event)" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1">SKU / Código</label>
+                                <input required id="new-sku" type="text" class="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ej. LUB-001" />
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1">Descripción</label>
+                                <input required id="new-name" type="text" class="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="Nombre de la pieza" />
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1">Ubicación Física</label>
+                                <input id="new-location" type="text" class="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="Pasillo, Anaquel..." />
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1">Stock Mínimo</label>
+                                <input required id="new-min-stock" type="number" min="0" class="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ej. 5" />
+                            </div>
+                            <div class="lg:col-span-4 flex justify-end mt-2">
+                                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+                                    Agregar al Catálogo
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderTransactionForm(type) {
+            const isOutbound = type === 'OUT';
+            const title = isOutbound ? 'Salida de Refacciones (Consumo)' : 'Entrada de Refacciones (Suministro)';
+            const icon = isOutbound ? '<i class="ph-bold ph-upload-simple text-rose-500 mr-2"></i>' : '<i class="ph-bold ph-download-simple text-emerald-500 mr-2"></i>';
+            const btnColor = isOutbound ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-600 hover:bg-emerald-700';
+            const inventory = getInventoryStatus();
+
+            let options = inventory.map(item => 
+                `<option value="${item.id}">${item.sku} - ${item.name} (Stock: ${item.currentStock})</option>`
+            ).join('');
+
+            return `
+                <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-sm border border-slate-100 p-6 md:p-8 animate-fade-in">
+                    <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center">
+                        ${icon} ${title}
+                    </h2>
+                    
+                    <form onsubmit="handleTransaction(event, '${type}')" class="space-y-5">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Seleccionar Refacción</label>
+                            <select required id="trans-part" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                                <option value="">-- Seleccione una pieza --</option>
+                                ${options}
+                            </select>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Cantidad</label>
+                                <input required id="trans-qty" type="number" min="1" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="0" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">
+                                    ${isOutbound ? 'Asignado a (Unidad/Proyecto)' : 'Referencia (Factura/Proveedor)'}
+                                </label>
+                                <input required id="trans-ref" type="text" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="${isOutbound ? 'Ej. Camión 45' : 'Ej. Factura A-123'}" />
+                            </div>
+                        </div>
+
+                        <div class="pt-4 border-t border-slate-100">
+                            <button type="submit" class="w-full text-white px-6 py-3 rounded-lg font-medium transition-colors ${btnColor}">
+                                Registrar ${isOutbound ? 'Salida' : 'Entrada'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
         }
 
         function closeReceipt() {
-            document.getElementById('receipt-modal').classList.add('hidden');
+            receiptData = null;
+            document.getElementById('receipt-container').classList.add('hidden');
+            navigate('out'); // Recargar la vista de salidas para limpiar
         }
 
-        // Inicializar
-        updateUI();
+        function renderReceiptModal() {
+            if (!receiptData) return;
+
+            const dateObj = new Date(receiptData.date);
+            const formattedDate = dateObj.toLocaleDateString('es-MX') + ' ' + dateObj.toLocaleTimeString('es-MX', {hour: '2-digit', minute:'2-digit'});
+            
+            const modalHtml = `
+                <div class="p-8 bg-white overflow-y-auto">
+                    <div class="text-center mb-8 border-b-2 border-slate-800 pb-6">
+                        <h2 class="text-2xl font-black text-slate-800 uppercase tracking-widest">Vale de Salida</h2>
+                        <p class="text-slate-500 text-sm mt-2">Folio de Operación: <span class="font-bold text-slate-700">${receiptData.id}</span></p>
+                        <p class="text-slate-500 text-sm">Fecha: <span class="font-medium text-slate-700">${formattedDate}</span></p>
+                    </div>
+
+                    <div class="space-y-4 mb-10">
+                        <div class="flex justify-between items-end border-b border-slate-200 pb-2">
+                            <span class="text-slate-500 text-sm uppercase tracking-wider font-semibold">SKU / Código</span>
+                            <span class="text-slate-800 font-bold">${receiptData.partSku}</span>
+                        </div>
+                        <div class="flex justify-between items-end border-b border-slate-200 pb-2">
+                            <span class="text-slate-500 text-sm uppercase tracking-wider font-semibold">Descripción</span>
+                            <span class="text-slate-800 text-right max-w-[60%]">${receiptData.partName}</span>
+                        </div>
+                        <div class="flex justify-between items-end border-b border-slate-200 pb-2">
+                            <span class="text-slate-500 text-sm uppercase tracking-wider font-semibold">Cantidad Despachada</span>
+                            <span class="text-2xl font-black text-slate-800">${receiptData.qty} <span class="text-sm font-normal text-slate-500">unidades</span></span>
+                        </div>
+                        <div class="flex justify-between items-end border-b border-slate-200 pb-2">
+                            <span class="text-slate-500 text-sm uppercase tracking-wider font-semibold">Asignado a / Destino</span>
+                            <span class="text-slate-800 font-medium text-right max-w-[60%] bg-slate-100 px-2 py-1 rounded">${receiptData.reference}</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-8 mt-16 pt-4">
+                        <div class="text-center">
+                            <div class="border-b border-slate-800 h-10 mb-2"></div>
+                            <p class="text-xs text-slate-600 font-bold uppercase tracking-wider">Entregó (Almacén)</p>
+                            <p class="text-xs text-slate-400 mt-1">Nombre y Firma</p>
+                        </div>
+                        <div class="text-center">
+                            <div class="border-b border-slate-800 h-10 mb-2"></div>
+                            <p class="text-xs text-slate-600 font-bold uppercase tracking-wider">Recibió de Conformidad</p>
+                            <p class="text-xs text-slate-400 mt-1">Nombre y Firma</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-50 p-4 flex justify-end space-x-3 border-t border-slate-200 no-print shrink-0">
+                    <button onclick="closeReceipt()" class="px-5 py-2.5 text-slate-600 font-medium hover:bg-slate-200 rounded-lg transition-colors">
+                        Cerrar y Continuar
+                    </button>
+                    <button onclick="window.print()" class="px-5 py-2.5 bg-slate-800 text-white font-medium hover:bg-slate-900 rounded-lg flex items-center shadow-md hover:shadow-lg transition-all">
+                        <i class="ph ph-printer mr-2 text-lg"></i> Imprimir Formato
+                    </button>
+                </div>
+            `;
+
+            document.getElementById('receipt-modal').innerHTML = modalHtml;
+            document.getElementById('receipt-container').classList.remove('hidden');
+        }
+
+        function renderContent() {
+            const container = document.getElementById('app-content');
+            
+            if (activeTab === 'dashboard') {
+                container.innerHTML = renderDashboard();
+            } else if (activeTab === 'inventory') {
+                container.innerHTML = renderInventory();
+            } else if (activeTab === 'in') {
+                container.innerHTML = renderTransactionForm('IN');
+            } else if (activeTab === 'out') {
+                container.innerHTML = renderTransactionForm('OUT');
+            }
+        }
+
+        // --- INICIALIZACIÓN ---
+        // Cargar vista inicial
+        navigate('dashboard');
 
     </script>
 </body>
