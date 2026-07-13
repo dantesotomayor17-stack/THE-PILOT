@@ -3,77 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema EGO PRO - Control de Almacén</title>
+    <title>Sistema EGO PRO - Control de Almacén (Tiempo Real)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.8/index.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
     <style>
         * { font-family: 'Inter', system-ui, sans-serif; }
-        
         @media print {
             body * { visibility: hidden; }
             #print-modal, #print-modal * { visibility: visible; }
-            #print-modal {
-                position: absolute;
-                left: 0; top: 0;
-                width: 100%; height: 100%;
-                background: white;
-            }
+            #print-modal { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: white; }
             .no-print { display: none !important; }
         }
-        
         .tab-content { display: none; animation: fadeIn 0.3s ease; }
         .tab-content.active { display: block; }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(8px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        @keyframes slideIn {
-            from { transform: translateX(120%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        
-        @keyframes slideOut {
-            from { transform: translateX(0); opacity: 1; }
-            to { transform: translateX(120%); opacity: 0; }
-        }
-        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideIn { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(120%); opacity: 0; } }
         .toast-enter { animation: slideIn 0.3s ease forwards; }
         .toast-exit { animation: slideOut 0.3s ease forwards; }
-        
         .sidebar-btn { position: relative; overflow: hidden; }
-        .sidebar-btn::before {
-            content: '';
-            position: absolute;
-            left: 0; top: 0;
-            width: 3px; height: 100%;
-            background: #10b981;
-            transform: scaleY(0);
-            transition: transform 0.2s;
-        }
+        .sidebar-btn::before { content: ''; position: absolute; left: 0; top: 0; width: 3px; height: 100%; background: #10b981; transform: scaleY(0); transition: transform 0.2s; }
         .sidebar-btn.active::before { transform: scaleY(1); }
-        
         .card-hover { transition: all 0.2s ease; }
         .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.08); }
-        
         input:focus, select:focus { border-color: #10b981 !important; }
-        
         .scrollbar-thin::-webkit-scrollbar { width: 6px; }
         .scrollbar-thin::-webkit-scrollbar-track { background: #f1f5f9; }
         .scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-        
         .badge-pulse { animation: pulse 2s infinite; }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
-        }
-        
-        .gradient-header {
-            background: linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%);
-        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        .sync-status { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+        .sync-online { background-color: #10b981; box-shadow: 0 0 8px #10b981; }
+        .sync-offline { background-color: #ef4444; }
+        .sync-syncing { background-color: #f59e0b; animation: pulse 1s infinite; }
     </style>
 </head>
 <body class="bg-gray-100 h-screen flex overflow-hidden">
@@ -85,7 +49,10 @@
                 <i class="fa-solid fa-truck-fast text-emerald-400 text-2xl"></i>
             </div>
             <h1 class="text-lg font-bold tracking-wider">SISTEMA EGO PRO</h1>
-            <p class="text-xs text-gray-500 mt-1">Control de Almacén v2.0</p>
+            <p class="text-xs text-gray-500 mt-1 flex items-center justify-center">
+                <span id="sync-indicator" class="sync-status sync-offline"></span>
+                <span id="sync-text">Conectando...</span>
+            </p>
         </div>
         <nav class="flex-1 p-4 space-y-1 overflow-y-auto scrollbar-thin">
             <button onclick="showTab('dashboard')" id="btn-dashboard" class="sidebar-btn active w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-all duration-200 bg-emerald-600 text-white">
@@ -140,7 +107,7 @@
                 <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 card-hover">
                     <div class="flex items-center justify-between mb-3">
                         <div class="p-2.5 bg-blue-100 text-blue-600 rounded-lg"><i class="fa-solid fa-cubes"></i></div>
-                        <span class="text-xs text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded-full" id="dash-items-trend">Catálogo</span>
+                        <span class="text-xs text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded-full">Catálogo</span>
                     </div>
                     <p class="text-2xl font-bold text-gray-800" id="dash-total-items">0</p>
                     <p class="text-xs text-gray-500 mt-1">Refacciones registradas</p>
@@ -148,7 +115,7 @@
                 <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 card-hover">
                     <div class="flex items-center justify-between mb-3">
                         <div class="p-2.5 bg-red-100 text-red-600 rounded-lg"><i class="fa-solid fa-triangle-exclamation"></i></div>
-                        <span class="text-xs text-red-600 font-medium bg-red-50 px-2 py-0.5 rounded-full badge-pulse" id="dash-alert-badge">Alertas</span>
+                        <span class="text-xs text-red-600 font-medium bg-red-50 px-2 py-0.5 rounded-full badge-pulse">Alertas</span>
                     </div>
                     <p class="text-2xl font-bold text-gray-800" id="dash-low-stock">0</p>
                     <p class="text-xs text-gray-500 mt-1">Stock bajo mínimo</p>
@@ -181,15 +148,11 @@
                             <option value="30">Últimos 30 días</option>
                         </select>
                     </div>
-                    <div style="height: 260px;">
-                        <canvas id="activityChart"></canvas>
-                    </div>
+                    <div style="height: 260px;"><canvas id="activityChart"></canvas></div>
                 </div>
                 <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
                     <h3 class="font-bold text-gray-800 mb-4">Distribución por Estado</h3>
-                    <div style="height: 260px;">
-                        <canvas id="statusChart"></canvas>
-                    </div>
+                    <div style="height: 260px;"><canvas id="statusChart"></canvas></div>
                 </div>
             </div>
             
@@ -202,12 +165,8 @@
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider border-b">
-                                <th class="p-4">SKU</th>
-                                <th class="p-4">Descripción</th>
-                                <th class="p-4 text-center">Stock Actual</th>
-                                <th class="p-4 text-center">Mínimo</th>
-                                <th class="p-4 text-center">Faltante</th>
-                                <th class="p-4 text-center">Acción</th>
+                                <th class="p-4">SKU</th><th class="p-4">Descripción</th><th class="p-4 text-center">Stock Actual</th>
+                                <th class="p-4 text-center">Mínimo</th><th class="p-4 text-center">Faltante</th><th class="p-4 text-center">Acción</th>
                             </tr>
                         </thead>
                         <tbody id="alerts-table" class="divide-y divide-gray-100"></tbody>
@@ -232,8 +191,6 @@
                     </button>
                 </div>
             </div>
-
-            <!-- Filtros -->
             <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6">
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
                     <div class="relative md:col-span-2">
@@ -254,20 +211,13 @@
                     </select>
                 </div>
             </div>
-
-            <!-- Tabla Inventario -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider border-b">
-                                <th class="p-4">SKU</th>
-                                <th class="p-4">Descripción</th>
-                                <th class="p-4">Ubicación</th>
-                                <th class="p-4 text-center">Stock</th>
-                                <th class="p-4 text-center">Mín.</th>
-                                <th class="p-4 text-center">Estado</th>
-                                <th class="p-4 text-center">Acciones</th>
+                                <th class="p-4">SKU</th><th class="p-4">Descripción</th><th class="p-4">Ubicación</th>
+                                <th class="p-4 text-center">Stock</th><th class="p-4 text-center">Mín.</th><th class="p-4 text-center">Estado</th><th class="p-4 text-center">Acciones</th>
                             </tr>
                         </thead>
                         <tbody id="inventory-table" class="divide-y divide-gray-100 text-sm"></tbody>
@@ -284,7 +234,6 @@
         <div id="entradas" class="tab-content">
             <h2 class="text-2xl font-bold text-gray-800 mb-1">Recepción de Mercancía</h2>
             <p class="text-sm text-gray-500 mb-6">Registra las entradas al almacén</p>
-            
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 lg:col-span-1 h-fit">
                     <h3 class="font-bold text-gray-800 mb-4 flex items-center"><i class="fa-solid fa-plus-circle text-emerald-600 mr-2"></i>Agregar a Lista</h3>
@@ -306,7 +255,6 @@
                         </button>
                     </div>
                 </div>
-
                 <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="font-bold text-gray-800">Lista de Recepción</h3>
@@ -316,10 +264,7 @@
                         <table class="w-full text-left border-collapse mb-4">
                             <thead>
                                 <tr class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider border-b">
-                                    <th class="p-2">SKU</th>
-                                    <th class="p-2">Descripción</th>
-                                    <th class="p-2 text-center">Cant.</th>
-                                    <th class="p-2 text-center">Acción</th>
+                                    <th class="p-2">SKU</th><th class="p-2">Descripción</th><th class="p-2 text-center">Cant.</th><th class="p-2 text-center">Acción</th>
                                 </tr>
                             </thead>
                             <tbody id="in-cart-table" class="divide-y divide-gray-100 text-sm"></tbody>
@@ -339,7 +284,6 @@
         <div id="salidas" class="tab-content">
             <h2 class="text-2xl font-bold text-gray-800 mb-1">Despacho de Refacciones</h2>
             <p class="text-sm text-gray-500 mb-6">Genera vales de salida</p>
-            
             <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
                 <h3 class="font-bold text-gray-800 mb-4">Datos del Movimiento</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -365,7 +309,6 @@
                     <input type="text" id="out-obs" class="w-full border rounded-lg p-2.5 text-sm outline-none bg-gray-50" placeholder="Notas adicionales...">
                 </div>
             </div>
-
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 lg:col-span-1 h-fit">
                     <h3 class="font-bold text-gray-800 mb-4 flex items-center"><i class="fa-solid fa-cart-flatbed mr-2 text-emerald-600"></i>Surtir Refacción</h3>
@@ -384,7 +327,6 @@
                         </button>
                     </div>
                 </div>
-
                 <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="font-bold text-gray-800">Vale de Salida</h3>
@@ -394,10 +336,7 @@
                         <table class="w-full text-left border-collapse mb-4">
                             <thead>
                                 <tr class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider border-b">
-                                    <th class="p-2">SKU</th>
-                                    <th class="p-2">Descripción</th>
-                                    <th class="p-2 text-center">Cant.</th>
-                                    <th class="p-2 text-center">Acción</th>
+                                    <th class="p-2">SKU</th><th class="p-2">Descripción</th><th class="p-2 text-center">Cant.</th><th class="p-2 text-center">Acción</th>
                                 </tr>
                             </thead>
                             <tbody id="out-cart-table" class="divide-y divide-gray-100 text-sm"></tbody>
@@ -424,7 +363,6 @@
                     <i class="fa-solid fa-file-export text-emerald-600"></i> <span>Exportar</span>
                 </button>
             </div>
-
             <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6">
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
                     <div class="relative md:col-span-2">
@@ -439,19 +377,13 @@
                     <input type="date" id="filter-date" onchange="renderHistorial()" class="border rounded-lg p-2 text-sm outline-none">
                 </div>
             </div>
-
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse">
                         <thead>
                             <tr class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider border-b">
-                                <th class="p-4">Folio</th>
-                                <th class="p-4">Tipo</th>
-                                <th class="p-4">Fecha</th>
-                                <th class="p-4">Destino/Origen</th>
-                                <th class="p-4 text-center">Piezas</th>
-                                <th class="p-4">Detalle</th>
-                                <th class="p-4 text-center">Acción</th>
+                                <th class="p-4">Folio</th><th class="p-4">Tipo</th><th class="p-4">Fecha</th><th class="p-4">Destino/Origen</th>
+                                <th class="p-4 text-center">Piezas</th><th class="p-4">Detalle</th><th class="p-4 text-center">Acción</th>
                             </tr>
                         </thead>
                         <tbody id="history-table" class="divide-y divide-gray-100 text-sm"></tbody>
@@ -465,7 +397,6 @@
         <div id="configuracion" class="tab-content">
             <h2 class="text-2xl font-bold text-gray-800 mb-1">Configuración</h2>
             <p class="text-sm text-gray-500 mb-6">Ajustes generales del sistema</p>
-
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                     <h3 class="font-bold text-gray-800 mb-4 flex items-center"><i class="fa-solid fa-building mr-2 text-emerald-600"></i>Datos de la Empresa</h3>
@@ -480,7 +411,6 @@
                         </div>
                     </div>
                 </div>
-
                 <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                     <h3 class="font-bold text-gray-800 mb-4 flex items-center"><i class="fa-solid fa-sliders mr-2 text-emerald-600"></i>Parámetros</h3>
                     <div class="space-y-3">
@@ -494,25 +424,20 @@
                         </div>
                     </div>
                 </div>
-
                 <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
                     <h3 class="font-bold text-gray-800 mb-4 flex items-center"><i class="fa-solid fa-database mr-2 text-emerald-600"></i>Respaldo de Datos</h3>
-                    <p class="text-sm text-gray-500 mb-4">Los datos se guardan automáticamente en tu navegador. Puedes exportar o restaurar un respaldo completo.</p>
+                    <p class="text-sm text-gray-500 mb-4">Los datos se guardan automáticamente en la base de datos en la nube (Firebase). Puedes exportar un respaldo local si lo deseas.</p>
                     <div class="flex flex-wrap gap-3">
                         <button onclick="exportBackup()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
-                            <i class="fa-solid fa-download mr-1"></i> Exportar Respaldo
+                            <i class="fa-solid fa-download mr-1"></i> Exportar Respaldo JSON
                         </button>
                         <label class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer">
-                            <i class="fa-solid fa-upload mr-1"></i> Restaurar Respaldo
+                            <i class="fa-solid fa-upload mr-1"></i> Restaurar Respaldo JSON
                             <input type="file" accept=".json" onchange="importBackup(event)" class="hidden">
                         </label>
-                        <button onclick="resetAllData()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
-                            <i class="fa-solid fa-trash mr-1"></i> Borrar Todo
-                        </button>
                     </div>
                 </div>
             </div>
-
             <div class="mt-6 flex justify-end">
                 <button onclick="saveConfig()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-lg font-medium transition shadow-sm">
                     <i class="fa-solid fa-save mr-1"></i> Guardar Configuración
@@ -595,7 +520,6 @@
             <button onclick="closePrintModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-800 no-print">
                 <i class="fa-solid fa-xmark text-2xl"></i>
             </button>
-            
             <div class="border-2 border-gray-800 p-6 lg:p-8">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b-2 border-gray-800 pb-4 mb-6 gap-4">
                     <div>
@@ -608,22 +532,11 @@
                         <p class="font-bold text-gray-800 mt-1">Folio: <span id="print-folio">0000</span></p>
                     </div>
                 </div>
-
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-gray-100 p-4 mb-6 border border-gray-300">
-                    <div>
-                        <p class="text-xs text-gray-500 uppercase font-bold">Tipo:</p>
-                        <p class="text-base font-bold text-gray-900" id="print-tipo">--</p>
-                    </div>
-                    <div>
-                        <p class="text-xs text-gray-500 uppercase font-bold" id="print-destino-lbl">Destino:</p>
-                        <p class="text-base font-bold text-gray-900" id="print-destino">--</p>
-                    </div>
-                    <div>
-                        <p class="text-xs text-gray-500 uppercase font-bold">Solicitante:</p>
-                        <p class="text-base font-bold text-gray-900" id="print-solicitante">--</p>
-                    </div>
+                    <div><p class="text-xs text-gray-500 uppercase font-bold">Tipo:</p><p class="text-base font-bold text-gray-900" id="print-tipo">--</p></div>
+                    <div><p class="text-xs text-gray-500 uppercase font-bold" id="print-destino-lbl">Destino:</p><p class="text-base font-bold text-gray-900" id="print-destino">--</p></div>
+                    <div><p class="text-xs text-gray-500 uppercase font-bold">Solicitante:</p><p class="text-base font-bold text-gray-900" id="print-solicitante">--</p></div>
                 </div>
-
                 <table class="w-full text-left border-collapse border border-gray-300 mb-8">
                     <thead>
                         <tr class="bg-gray-200 text-gray-800 text-sm border-b border-gray-300">
@@ -635,34 +548,16 @@
                     </thead>
                     <tbody id="print-items" class="text-sm"></tbody>
                 </table>
-
                 <div id="print-obs-container" class="hidden mb-8 p-3 bg-gray-50 border border-gray-200 rounded">
                     <p class="text-xs text-gray-500 uppercase font-bold mb-1">Observaciones:</p>
                     <p class="text-sm text-gray-800" id="print-obs"></p>
                 </div>
-
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-8 mt-16">
-                    <div class="text-center">
-                        <div class="border-t border-gray-800 pt-2">
-                            <p class="font-bold text-gray-800 text-sm">Entregó (Almacén)</p>
-                            <p class="text-xs text-gray-500">Nombre y Firma</p>
-                        </div>
-                    </div>
-                    <div class="text-center">
-                        <div class="border-t border-gray-800 pt-2">
-                            <p class="font-bold text-gray-800 text-sm">Recibió</p>
-                            <p class="text-xs text-gray-500">Nombre y Firma</p>
-                        </div>
-                    </div>
-                    <div class="text-center">
-                        <div class="border-t border-gray-800 pt-2">
-                            <p class="font-bold text-gray-800 text-sm">Vo.Bo. Supervisor</p>
-                            <p class="text-xs text-gray-500">Nombre y Firma</p>
-                        </div>
-                    </div>
+                    <div class="text-center"><div class="border-t border-gray-800 pt-2"><p class="font-bold text-gray-800 text-sm">Entregó (Almacén)</p><p class="text-xs text-gray-500">Nombre y Firma</p></div></div>
+                    <div class="text-center"><div class="border-t border-gray-800 pt-2"><p class="font-bold text-gray-800 text-sm">Recibió</p><p class="text-xs text-gray-500">Nombre y Firma</p></div></div>
+                    <div class="text-center"><div class="border-t border-gray-800 pt-2"><p class="font-bold text-gray-800 text-sm">Vo.Bo. Supervisor</p><p class="text-xs text-gray-500">Nombre y Firma</p></div></div>
                 </div>
             </div>
-
             <div class="mt-6 flex flex-wrap justify-center gap-3 no-print">
                 <button onclick="window.print()" class="bg-gray-900 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-gray-800 shadow-lg transition">
                     <i class="fa-solid fa-print mr-2"></i>Imprimir
@@ -677,10 +572,38 @@
     <!-- Toast Container -->
     <div id="toast-container" class="fixed top-4 right-4 z-[100] space-y-2 pointer-events-none"></div>
 
-    <script>
-        // ============ ESTADO ============
-        const STORAGE_KEY = 'ego_pro_data_v2';
-        
+    <!-- ========================================== -->
+    <!-- LÓGICA DE FIREBASE Y APLICACIÓN -->
+    <!-- ========================================== -->
+    <script type="module">
+        // 1. IMPORTAR FIREBASE
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+        // 2. CONFIGURACIÓN DE FIREBASE (Integrada automáticamente)
+        const firebaseConfig = {
+            apiKey: "AIzaSyDLbFKnGOTvEFlARa4rUrWzBhIixxoR8yw",
+            authDomain: "almacen-eg0.firebaseapp.com",
+            projectId: "almacen-eg0",
+            storageBucket: "almacen-eg0.firebasestorage.app",
+            messagingSenderId: "1085567174038",
+            appId: "1:1085567174038:web:f0fa9dd4a3542ba70649b7",
+            measurementId: "G-D1JW0F7NEN"
+        };
+
+        // Inicializar Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        // Autenticación anónima
+        signInAnonymously(auth).catch((error) => {
+            console.error("Error de autenticación:", error);
+            toast("Error de conexión a Firebase", "error");
+        });
+
+        // 3. ESTADO GLOBAL DE LA APLICACIÓN
         let state = {
             inventario: [
                 { sku: 'FIL-001', desc: 'Filtro de Aceite Diésel', loc: 'Pasillo A - Nivel 2', stock: 24, min: 10 },
@@ -706,40 +629,70 @@
         let editingSku = null;
         let activityChart = null;
         let statusChart = null;
+        let isSyncing = false;
 
-        // ============ PERSISTENCIA ============
-        function saveState() {
-            try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-            } catch(e) { console.warn('No se pudo guardar', e); }
-        }
-
-        function loadState() {
-            try {
-                const saved = localStorage.getItem(STORAGE_KEY);
-                if (saved) {
-                    const parsed = JSON.parse(saved);
-                    state = { ...state, ...parsed };
-                    if (parsed.config) state.config = { ...state.config, ...parsed.config };
+        // 4. PERSISTENCIA EN TIEMPO REAL (FIRESTORE)
+        function setupRealtimeListener() {
+            const docRef = doc(db, "sistema", "ego_pro_data");
+            
+            onSnapshot(docRef, (docSnapshot) => {
+                if (docSnapshot.exists()) {
+                    const data = docSnapshot.data();
+                    state = { 
+                        inventario: data.inventario || [],
+                        historial: data.historial || [],
+                        config: { ...state.config, ...(data.config || {}) }
+                    };
+                    updateSyncStatus('online');
+                    refreshAll();
+                } else {
+                    // Si no existe, lo creamos con el estado inicial
+                    setDoc(docRef, state).then(() => {
+                        updateSyncStatus('online');
+                        refreshAll();
+                    });
                 }
-            } catch(e) { console.warn('No se pudo cargar', e); }
+            }, (error) => {
+                console.error("Error escuchando cambios:", error);
+                updateSyncStatus('offline');
+            });
         }
 
-        // ============ TOAST ============
-        function toast(msg, type = 'success') {
+        async function saveState() {
+            try {
+                updateSyncStatus('syncing');
+                const docRef = doc(db, "sistema", "ego_pro_data");
+                await setDoc(docRef, state);
+                updateSyncStatus('online');
+            } catch (e) {
+                console.error("Error al guardar en la nube: ", e);
+                updateSyncStatus('offline');
+                toast("Error al guardar en la nube", "error");
+            }
+        }
+
+        function updateSyncStatus(status) {
+            const indicator = document.getElementById('sync-indicator');
+            const text = document.getElementById('sync-text');
+            indicator.className = 'sync-status';
+            
+            if (status === 'online') {
+                indicator.classList.add('sync-online');
+                text.innerText = 'Sincronizado en tiempo real';
+            } else if (status === 'syncing') {
+                indicator.classList.add('sync-syncing');
+                text.innerText = 'Guardando...';
+            } else {
+                indicator.classList.add('sync-offline');
+                text.innerText = 'Sin conexión';
+            }
+        }
+
+        // 5. FUNCIONES DE LA INTERFAZ (UI)
+        window.toast = function(msg, type = 'success') {
             const container = document.getElementById('toast-container');
-            const colors = {
-                success: 'bg-emerald-600',
-                error: 'bg-red-600',
-                warning: 'bg-amber-500',
-                info: 'bg-blue-600'
-            };
-            const icons = {
-                success: 'fa-circle-check',
-                error: 'fa-circle-xmark',
-                warning: 'fa-triangle-exclamation',
-                info: 'fa-circle-info'
-            };
+            const colors = { success: 'bg-emerald-600', error: 'bg-red-600', warning: 'bg-amber-500', info: 'bg-blue-600' };
+            const icons = { success: 'fa-circle-check', error: 'fa-circle-xmark', warning: 'fa-triangle-exclamation', info: 'fa-circle-info' };
             const el = document.createElement('div');
             el.className = `toast-enter pointer-events-auto ${colors[type]} text-white px-4 py-3 rounded-lg shadow-lg flex items-center space-x-3 min-w-[280px] max-w-md`;
             el.innerHTML = `<i class="fa-solid ${icons[type]}"></i><span class="text-sm font-medium flex-1">${msg}</span>`;
@@ -751,8 +704,7 @@
             }, 3000);
         }
 
-        // ============ CONFIRM ============
-        function confirmAction(title, msg, onOk, danger = true) {
+        window.confirmAction = function(title, msg, onOk, danger = true) {
             document.getElementById('confirm-title').innerText = title;
             document.getElementById('confirm-msg').innerText = msg;
             const icon = document.getElementById('confirm-icon');
@@ -766,18 +718,17 @@
                 icon.innerHTML = '<i class="fa-solid fa-check text-2xl"></i>';
                 btn.className = 'flex-1 px-4 py-2 rounded-lg text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition';
             }
-            btn.onclick = () => { closeConfirm(); onOk(); };
+            btn.onclick = () => { window.closeConfirm(); onOk(); };
             document.getElementById('confirm-modal').classList.remove('hidden');
         }
-        function closeConfirm() {
+        
+        window.closeConfirm = function() {
             document.getElementById('confirm-modal').classList.add('hidden');
         }
 
-        // ============ NAVEGACIÓN ============
-        function showTab(tabId) {
+        window.showTab = function(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.getElementById(tabId).classList.add('active');
-            
             document.querySelectorAll('.sidebar-btn').forEach(btn => {
                 btn.className = 'sidebar-btn w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left text-gray-400 hover:bg-gray-800 hover:text-white transition-all duration-200';
             });
@@ -789,10 +740,8 @@
             if (tabId === 'configuracion') loadConfigForm();
         }
 
-        // ============ DASHBOARD ============
-        function updateDashboard() {
+        window.updateDashboard = function() {
             document.getElementById('dash-total-items').innerText = state.inventario.length;
-            
             let totalPieces = 0, lowStockCount = 0, alertsHtml = '';
             state.inventario.forEach(item => {
                 totalPieces += item.stock;
@@ -811,60 +760,47 @@
                                     <i class="fa-solid fa-plus mr-1"></i>Reabastecer
                                 </button>
                             </td>
-                        </tr>
-                    `;
+                        </tr>`;
                 }
             });
-
-            // Movimientos de hoy
             const hoy = new Date().toISOString().split('T')[0];
             const movHoy = state.historial.filter(h => h.fecha && h.fecha.startsWith(hoy)).length;
-
             document.getElementById('dash-total-pieces').innerText = totalPieces;
             document.getElementById('dash-low-stock').innerText = lowStockCount;
             document.getElementById('dash-today-movements').innerText = movHoy;
             document.getElementById('alerts-count').innerText = `${lowStockCount} alertas`;
             document.getElementById('alerts-table').innerHTML = alertsHtml || '<tr><td colspan="6" class="p-6 text-center text-gray-500"><i class="fa-solid fa-circle-check text-emerald-500 text-2xl mb-2"></i><br>Todo el stock está en niveles óptimos</td></tr>';
-
-            // Fecha
             const fecha = new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
             document.getElementById('dash-date').innerText = fecha.charAt(0).toUpperCase() + fecha.slice(1);
         }
 
-        function quickRestock(sku) {
-            showTab('entradas');
+        window.quickRestock = function(sku) {
+            window.showTab('entradas');
             setTimeout(() => {
                 document.getElementById('in-select').value = sku;
                 document.getElementById('in-qty').focus();
             }, 100);
         }
 
-        // ============ GRÁFICOS ============
-        function updateCharts() {
+        window.updateCharts = function() {
             updateActivityChart();
             updateStatusChart();
         }
 
-        function updateChart() { updateActivityChart(); }
+        window.updateChart = function() { updateActivityChart(); }
 
         function updateActivityChart() {
             const days = parseInt(document.getElementById('chart-range').value);
-            const labels = [];
-            const entradas = [];
-            const salidas = [];
-            
+            const labels = [], entradas = [], salidas = [];
             for (let i = days - 1; i >= 0; i--) {
-                const d = new Date();
-                d.setDate(d.getDate() - i);
+                const d = new Date(); d.setDate(d.getDate() - i);
                 const key = d.toISOString().split('T')[0];
                 labels.push(d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }));
-                
                 const ent = state.historial.filter(h => h.tipo === 'entrada' && h.fecha && h.fecha.startsWith(key));
                 const sal = state.historial.filter(h => h.tipo === 'salida' && h.fecha && h.fecha.startsWith(key));
                 entradas.push(ent.reduce((s, h) => s + (h.totalPiezas || 0), 0));
                 salidas.push(sal.reduce((s, h) => s + (h.totalPiezas || 0), 0));
             }
-
             const ctx = document.getElementById('activityChart').getContext('2d');
             if (activityChart) activityChart.destroy();
             activityChart = new Chart(ctx, {
@@ -876,11 +812,7 @@
                         { label: 'Salidas', data: salidas, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', tension: 0.4, fill: true, borderWidth: 2 }
                     ]
                 },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8 } } },
-                    scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
-                }
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8 } } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
             });
         }
 
@@ -897,25 +829,16 @@
                 type: 'doughnut',
                 data: {
                     labels: ['Óptimo', 'Bajo', 'Sin Stock'],
-                    datasets: [{
-                        data: [opt, bajo, sin],
-                        backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
-                        borderWidth: 0
-                    }]
+                    datasets: [{ data: [opt, bajo, sin], backgroundColor: ['#10b981', '#f59e0b', '#ef4444'], borderWidth: 0 }]
                 },
-                options: {
-                    responsive: true, maintainAspectRatio: false, cutout: '65%',
-                    plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, padding: 15 } } }
-                }
+                options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, padding: 15 } } } }
             });
         }
 
-        // ============ INVENTARIO ============
-        function updateInventarioTable() {
+        window.updateInventarioTable = function() {
             const search = document.getElementById('search-inventory').value.toLowerCase();
             const statusFilter = document.getElementById('filter-status').value;
             const sortBy = document.getElementById('sort-by').value;
-
             let filtered = state.inventario.filter(item => {
                 const matchSearch = item.sku.toLowerCase().includes(search) || item.desc.toLowerCase().includes(search);
                 let matchStatus = true;
@@ -924,7 +847,6 @@
                 else if (statusFilter === 'zero') matchStatus = item.stock === 0;
                 return matchSearch && matchStatus;
             });
-
             filtered.sort((a, b) => {
                 if (sortBy === 'sku') return a.sku.localeCompare(b.sku);
                 if (sortBy === 'desc') return a.desc.localeCompare(b.desc);
@@ -932,7 +854,6 @@
                 if (sortBy === 'stock-desc') return b.stock - a.stock;
                 return 0;
             });
-
             let html = '', totalStock = 0;
             filtered.forEach(item => {
                 totalStock += item.stock;
@@ -940,7 +861,6 @@
                 if (item.stock === 0) statusBadge = '<span class="text-red-700 bg-red-50 px-2 py-1 rounded-md text-xs font-bold border border-red-200">SIN STOCK</span>';
                 else if (item.stock <= item.min) statusBadge = '<span class="text-amber-700 bg-amber-50 px-2 py-1 rounded-md text-xs font-bold border border-amber-200">BAJO</span>';
                 else statusBadge = '<span class="text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md text-xs font-bold border border-emerald-200">ÓPTIMO</span>';
-                
                 html += `
                     <tr class="hover:bg-gray-50">
                         <td class="p-4 font-medium text-gray-800 font-mono text-xs">${item.sku}</td>
@@ -955,15 +875,14 @@
                                 <button onclick="deletePart('${item.sku}')" class="p-1.5 text-red-600 hover:bg-red-50 rounded" title="Eliminar"><i class="fa-solid fa-trash text-xs"></i></button>
                             </div>
                         </td>
-                    </tr>
-                `;
+                    </tr>`;
             });
             document.getElementById('inventory-table').innerHTML = html || '<tr><td colspan="7" class="p-6 text-center text-gray-500">No se encontraron refacciones</td></tr>';
             document.getElementById('inventory-count').innerText = `${filtered.length} refacciones`;
             document.getElementById('inventory-total-stock').innerText = `Total: ${totalStock} piezas`;
         }
 
-        function openNewPartModal() {
+        window.openNewPartModal = function() {
             editingSku = null;
             document.getElementById('part-modal-title').innerText = 'Nueva Refacción';
             document.getElementById('part-sku').value = '';
@@ -975,7 +894,7 @@
             document.getElementById('part-modal').classList.remove('hidden');
         }
 
-        function editPart(sku) {
+        window.editPart = function(sku) {
             const item = state.inventario.find(i => i.sku === sku);
             if (!item) return;
             editingSku = sku;
@@ -989,19 +908,17 @@
             document.getElementById('part-modal').classList.remove('hidden');
         }
 
-        function closePartModal() {
+        window.closePartModal = function() {
             document.getElementById('part-modal').classList.add('hidden');
         }
 
-        function savePart() {
+        window.savePart = async function() {
             const sku = document.getElementById('part-sku').value.trim().toUpperCase();
             const desc = document.getElementById('part-desc').value.trim();
             const loc = document.getElementById('part-loc').value.trim();
             const stock = parseInt(document.getElementById('part-stock').value) || 0;
             const min = parseInt(document.getElementById('part-min').value) || 0;
-
             if (!sku || !desc) { toast('SKU y Descripción son obligatorios', 'error'); return; }
-
             if (editingSku) {
                 const item = state.inventario.find(i => i.sku === editingSku);
                 item.desc = desc; item.loc = loc || 'Sin asignar'; item.stock = stock; item.min = min;
@@ -1011,21 +928,20 @@
                 state.inventario.push({ sku, desc, loc: loc || 'Sin asignar', stock, min });
                 toast('Refacción creada', 'success');
             }
-            saveState();
+            await saveState();
             closePartModal();
             refreshAll();
         }
 
-        function deletePart(sku) {
-            confirmAction('Eliminar Refacción', `¿Eliminar "${sku}" del inventario? Esta acción no se puede deshacer.`, () => {
+        window.deletePart = async function(sku) {
+            confirmAction('Eliminar Refacción', `¿Eliminar "${sku}" del inventario? Esta acción no se puede deshacer.`, async () => {
                 state.inventario = state.inventario.filter(i => i.sku !== sku);
-                saveState();
+                await saveState();
                 refreshAll();
                 toast('Refacción eliminada', 'success');
             });
         }
 
-        // ============ SELECTS ============
         function updateSelects() {
             let html = '<option value="">-- Seleccione una refacción --</option>';
             state.inventario.forEach(item => {
@@ -1033,8 +949,6 @@
             });
             document.getElementById('in-select').innerHTML = html;
             document.getElementById('out-select').innerHTML = html;
-            
-            // Info stock en salidas
             document.getElementById('out-select').addEventListener('change', function() {
                 const item = state.inventario.find(i => i.sku === this.value);
                 const info = document.getElementById('out-stock-info');
@@ -1044,20 +958,15 @@
             });
         }
 
-        // ============ CARRITOS ============
-        function addToCart(type) {
+        window.addToCart = function(type) {
             const selectId = type === 'in' ? 'in-select' : 'out-select';
             const qtyId = type === 'in' ? 'in-qty' : 'out-qty';
             const cart = type === 'in' ? cartIn : cartOut;
-
             const sku = document.getElementById(selectId).value;
             const qty = parseInt(document.getElementById(qtyId).value);
-
             if (!sku || isNaN(qty) || qty <= 0) { toast('Seleccione artículo y cantidad válida', 'error'); return; }
-
             const item = state.inventario.find(i => i.sku === sku);
             if (type === 'out' && qty > item.stock) { toast(`Stock insuficiente. Disponible: ${item.stock}`, 'error'); return; }
-
             const existing = cart.find(i => i.sku === sku);
             if (existing) {
                 const newQty = existing.qty + qty;
@@ -1066,20 +975,19 @@
             } else {
                 cart.push({ sku: item.sku, desc: item.desc, qty, loc: item.loc });
             }
-
             document.getElementById(selectId).value = '';
             document.getElementById(qtyId).value = '1';
             renderCart(type);
             toast(`${qty}x ${item.sku} agregado`, 'info');
         }
 
-        function removeFromCart(type, index) {
+        window.removeFromCart = function(type, index) {
             const cart = type === 'in' ? cartIn : cartOut;
             cart.splice(index, 1);
             renderCart(type);
         }
 
-        function clearCart(type) {
+        window.clearCart = function(type) {
             const cart = type === 'in' ? cartIn : cartOut;
             if (cart.length === 0) return;
             confirmAction('Vaciar lista', '¿Eliminar todos los artículos de la lista?', () => {
@@ -1092,7 +1000,6 @@
             const cart = type === 'in' ? cartIn : cartOut;
             const tableId = type === 'in' ? 'in-cart-table' : 'out-cart-table';
             const totalId = type === 'in' ? 'in-cart-total' : 'out-cart-total';
-            
             let html = '', totalQty = 0;
             cart.forEach((item, index) => {
                 totalQty += item.qty;
@@ -1104,18 +1011,15 @@
                         <td class="p-2 text-center">
                             <button onclick="removeFromCart('${type}', ${index})" class="text-red-500 hover:text-red-700 p-1"><i class="fa-solid fa-trash text-xs"></i></button>
                         </td>
-                    </tr>
-                `;
+                    </tr>`;
             });
             document.getElementById(tableId).innerHTML = html || '<tr><td colspan="4" class="p-6 text-center text-gray-400">Lista vacía</td></tr>';
             document.getElementById(totalId).innerText = `Total: ${totalQty} piezas`;
         }
 
-        // ============ ENTRADAS ============
-        function processEntrada() {
+        window.processEntrada = async function() {
             if (cartIn.length === 0) { toast('La lista está vacía', 'error'); return; }
             const note = document.getElementById('in-note').value.trim();
-            
             let totalPiezas = 0;
             const items = cartIn.map(ci => {
                 totalPiezas += ci.qty;
@@ -1123,20 +1027,12 @@
                 inv.stock += ci.qty;
                 return { ...ci };
             });
-
             state.historial.unshift({
-                id: Date.now(),
-                tipo: 'entrada',
-                folio: 'E-' + Date.now().toString().slice(-6),
-                fecha: new Date().toISOString(),
-                destino: note || 'Reabastecimiento general',
-                solicitante: 'Almacén',
-                items,
-                totalPiezas,
-                obs: note
+                id: Date.now(), tipo: 'entrada', folio: 'E-' + Date.now().toString().slice(-6),
+                fecha: new Date().toISOString(), destino: note || 'Reabastecimiento general',
+                solicitante: 'Almacén', items, totalPiezas, obs: note
             });
-
-            saveState();
+            await saveState();
             cartIn = [];
             document.getElementById('in-note').value = '';
             renderCart('in');
@@ -1144,14 +1040,12 @@
             toast(`Entrada registrada: ${totalPiezas} piezas`, 'success');
         }
 
-        // ============ SALIDAS ============
-        function setTipoSalida(tipo) {
+        window.setTipoSalida = function(tipo) {
             tipoSalida = tipo;
             const btnInt = document.getElementById('btn-tipo-interno');
             const btnExt = document.getElementById('btn-tipo-externo');
             const lblDest = document.getElementById('lbl-destino');
             const inputDest = document.getElementById('out-destino');
-
             if (tipo === 'Interno') {
                 btnInt.className = "py-3 border-2 border-emerald-600 bg-emerald-50 text-emerald-700 rounded-lg font-bold transition";
                 btnExt.className = "py-3 border-2 border-gray-200 text-gray-500 rounded-lg font-bold hover:bg-gray-50 transition";
@@ -1165,18 +1059,15 @@
             }
         }
 
-        function processSalida() {
+        window.processSalida = async function() {
             if (cartOut.length === 0) { toast('La lista está vacía', 'error'); return; }
             const destino = document.getElementById('out-destino').value.trim();
             const solicitante = document.getElementById('out-solicitante').value.trim();
             const obs = document.getElementById('out-obs').value.trim();
-            
             if (!destino) { toast('Especifique el destino', 'error'); return; }
             if (!solicitante) { toast('Especifique el solicitante', 'error'); return; }
-
             const folio = state.config.folioPrefix + '-' + state.config.folioActual.toString().padStart(4, '0');
             const fechaActual = new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-            
             document.getElementById('print-empresa').innerText = state.config.nombre;
             document.getElementById('print-subtitulo').innerText = state.config.subtitulo;
             document.getElementById('print-fecha').innerText = `Fecha: ${fechaActual}`;
@@ -1185,14 +1076,12 @@
             document.getElementById('print-destino-lbl').innerText = tipoSalida === 'Interno' ? 'Unidad / Proyecto:' : 'Cliente:';
             document.getElementById('print-destino').innerText = destino;
             document.getElementById('print-solicitante').innerText = solicitante;
-
             if (obs) {
                 document.getElementById('print-obs-container').classList.remove('hidden');
                 document.getElementById('print-obs').innerText = obs;
             } else {
                 document.getElementById('print-obs-container').classList.add('hidden');
             }
-
             let itemsHtml = '', totalPiezas = 0;
             const items = [];
             cartOut.forEach(item => {
@@ -1206,29 +1095,16 @@
                         <td class="p-3 border-r border-gray-300">${item.desc}</td>
                         <td class="p-3 text-center border-r border-gray-300 text-xs">${item.loc}</td>
                         <td class="p-3 text-center font-bold text-lg">${item.qty}</td>
-                    </tr>
-                `;
+                    </tr>`;
             });
-
             document.getElementById('print-items').innerHTML = itemsHtml;
             document.getElementById('print-modal').classList.remove('hidden');
-
             state.historial.unshift({
-                id: Date.now(),
-                tipo: 'salida',
-                folio,
-                fecha: new Date().toISOString(),
-                destino,
-                solicitante,
-                tipoMovimiento: tipoSalida,
-                items,
-                totalPiezas,
-                obs
+                id: Date.now(), tipo: 'salida', folio, fecha: new Date().toISOString(),
+                destino, solicitante, tipoMovimiento: tipoSalida, items, totalPiezas, obs
             });
-
             state.config.folioActual++;
-            saveState();
-            
+            await saveState();
             cartOut = [];
             document.getElementById('out-destino').value = '';
             document.getElementById('out-solicitante').value = '';
@@ -1238,34 +1114,24 @@
             toast(`Vale ${folio} generado`, 'success');
         }
 
-        function closePrintModal() {
+        window.closePrintModal = function() {
             document.getElementById('print-modal').classList.add('hidden');
         }
 
-        // ============ HISTORIAL ============
-        function renderHistorial() {
+        window.renderHistorial = function() {
             const search = document.getElementById('search-history').value.toLowerCase();
             const typeFilter = document.getElementById('filter-type').value;
             const dateFilter = document.getElementById('filter-date').value;
-
             let filtered = state.historial.filter(h => {
-                const matchSearch = !search || 
-                    h.folio.toLowerCase().includes(search) ||
-                    h.destino.toLowerCase().includes(search) ||
-                    (h.solicitante && h.solicitante.toLowerCase().includes(search)) ||
-                    h.items.some(i => i.sku.toLowerCase().includes(search) || i.desc.toLowerCase().includes(search));
+                const matchSearch = !search || h.folio.toLowerCase().includes(search) || h.destino.toLowerCase().includes(search) || (h.solicitante && h.solicitante.toLowerCase().includes(search)) || h.items.some(i => i.sku.toLowerCase().includes(search) || i.desc.toLowerCase().includes(search));
                 const matchType = typeFilter === 'all' || h.tipo === typeFilter;
                 const matchDate = !dateFilter || (h.fecha && h.fecha.startsWith(dateFilter));
                 return matchSearch && matchType && matchDate;
             });
-
             let html = '';
             filtered.forEach(h => {
                 const fecha = new Date(h.fecha).toLocaleString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-                const badge = h.tipo === 'entrada' 
-                    ? '<span class="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md text-xs font-bold">ENTRADA</span>'
-                    : '<span class="bg-red-100 text-red-700 px-2 py-1 rounded-md text-xs font-bold">SALIDA</span>';
-                
+                const badge = h.tipo === 'entrada' ? '<span class="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md text-xs font-bold">ENTRADA</span>' : '<span class="bg-red-100 text-red-700 px-2 py-1 rounded-md text-xs font-bold">SALIDA</span>';
                 html += `
                     <tr class="hover:bg-gray-50">
                         <td class="p-4 font-mono text-xs font-bold">${h.folio}</td>
@@ -1277,25 +1143,17 @@
                         <td class="p-4 text-center">
                             <button onclick="viewDetail(${h.id})" class="text-blue-600 hover:bg-blue-50 p-1.5 rounded" title="Ver detalle"><i class="fa-solid fa-eye text-xs"></i></button>
                         </td>
-                    </tr>
-                `;
+                    </tr>`;
             });
             document.getElementById('history-table').innerHTML = html || '<tr><td colspan="7" class="p-6 text-center text-gray-500">No hay movimientos registrados</td></tr>';
             document.getElementById('history-count').innerText = `${filtered.length} movimientos`;
         }
 
-        function viewDetail(id) {
+        window.viewDetail = function(id) {
             const h = state.historial.find(x => x.id === id);
             if (!h) return;
             const fecha = new Date(h.fecha).toLocaleString('es-MX');
-            let itemsHtml = h.items.map(i => `
-                <tr class="border-b">
-                    <td class="p-2 font-mono text-xs">${i.sku}</td>
-                    <td class="p-2">${i.desc}</td>
-                    <td class="p-2 text-center font-bold">${i.qty}</td>
-                </tr>
-            `).join('');
-            
+            let itemsHtml = h.items.map(i => `<tr class="border-b"><td class="p-2 font-mono text-xs">${i.sku}</td><td class="p-2">${i.desc}</td><td class="p-2 text-center font-bold">${i.qty}</td></tr>`).join('');
             document.getElementById('detail-content').innerHTML = `
                 <div class="grid grid-cols-2 gap-4 mb-4">
                     <div><p class="text-xs text-gray-500">Folio</p><p class="font-bold">${h.folio}</p></div>
@@ -1309,12 +1167,11 @@
                 <table class="w-full text-sm border-collapse border">
                     <thead><tr class="bg-gray-100"><th class="p-2 border">SKU</th><th class="p-2 border">Descripción</th><th class="p-2 border">Cant.</th></tr></thead>
                     <tbody>${itemsHtml}</tbody>
-                </table>
-            `;
+                </table>`;
             document.getElementById('detail-modal').classList.remove('hidden');
         }
 
-        function exportarHistorial() {
+        window.exportarHistorial = function() {
             if (state.historial.length === 0) { toast('No hay historial para exportar', 'warning'); return; }
             let csv = "\uFEFFFolio,Tipo,Fecha,Destino,Solicitante,Total Piezas,Observaciones,Detalle Items\n";
             state.historial.forEach(h => {
@@ -1325,8 +1182,7 @@
             toast('Historial exportado', 'success');
         }
 
-        // ============ EXPORTAR INVENTARIO ============
-        function descargarExcel() {
+        window.descargarExcel = function() {
             let csv = "\uFEFFCódigo SKU,Descripción,Ubicación,Stock Actual,Stock Mínimo,Estado\n";
             state.inventario.forEach(row => {
                 let status = row.stock === 0 ? "Sin Stock" : row.stock <= row.min ? "Bajo" : "Óptimo";
@@ -1347,24 +1203,23 @@
             document.body.removeChild(link);
         }
 
-        // ============ CONFIGURACIÓN ============
-        function loadConfigForm() {
+        window.loadConfigForm = function() {
             document.getElementById('cfg-nombre').value = state.config.nombre;
             document.getElementById('cfg-subtitulo').value = state.config.subtitulo;
             document.getElementById('cfg-min-default').value = state.config.minDefault;
             document.getElementById('cfg-folio-prefix').value = state.config.folioPrefix;
         }
 
-        function saveConfig() {
+        window.saveConfig = async function() {
             state.config.nombre = document.getElementById('cfg-nombre').value.trim() || 'SISTEMA EGO PRO';
             state.config.subtitulo = document.getElementById('cfg-subtitulo').value.trim() || 'Control de Almacén';
             state.config.minDefault = parseInt(document.getElementById('cfg-min-default').value) || 5;
             state.config.folioPrefix = document.getElementById('cfg-folio-prefix').value.trim().toUpperCase() || 'VP';
-            saveState();
+            await saveState();
             toast('Configuración guardada', 'success');
         }
 
-        function exportBackup() {
+        window.exportBackup = function() {
             const data = JSON.stringify(state, null, 2);
             const blob = new Blob([data], { type: 'application/json' });
             const link = document.createElement("a");
@@ -1374,36 +1229,26 @@
             toast('Respaldo exportado', 'success');
         }
 
-        function importBackup(event) {
+        window.importBackup = async function(event) {
             const file = event.target.files[0];
             if (!file) return;
             const reader = new FileReader();
             reader.onload = (e) => {
                 try {
                     const data = JSON.parse(e.target.result);
-                    confirmAction('Restaurar respaldo', 'Esto reemplazará todos los datos actuales. ¿Continuar?', () => {
+                    confirmAction('Restaurar respaldo', 'Esto reemplazará todos los datos actuales. ¿Continuar?', async () => {
                         state = { ...state, ...data };
                         if (data.config) state.config = { ...state.config, ...data.config };
-                        saveState();
+                        await saveState();
                         refreshAll();
                         toast('Respaldo restaurado', 'success');
                     }, false);
-                } catch(err) {
-                    toast('Archivo inválido', 'error');
-                }
+                } catch(err) { toast('Archivo inválido', 'error'); }
             };
             reader.readAsText(file);
             event.target.value = '';
         }
 
-        function resetAllData() {
-            confirmAction('Borrar todos los datos', 'Se eliminarán TODAS las refacciones, historial y configuración. Esta acción es irreversible.', () => {
-                localStorage.removeItem(STORAGE_KEY);
-                location.reload();
-            });
-        }
-
-        // ============ REFRESH ============
         function refreshAll() {
             updateDashboard();
             updateInventarioTable();
@@ -1414,10 +1259,9 @@
             if (document.getElementById('historial').classList.contains('active')) renderHistorial();
         }
 
-        // ============ INIT ============
+        // 6. INICIALIZACIÓN
         function init() {
-            loadState();
-            refreshAll();
+            setupRealtimeListener();
             loadConfigForm();
         }
 
@@ -1425,4 +1269,3 @@
     </script>
 </body>
 </html>
-
