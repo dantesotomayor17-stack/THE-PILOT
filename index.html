@@ -3,593 +3,1426 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Almacén</title>
-    
-    <!-- Carga de Tailwind CSS para el diseño -->
+    <title>Sistema EGO PRO - Control de Almacén</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Carga de Phosphor Icons (Alternativa a Lucide para HTML puro) -->
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
-
-    <!-- Estilos específicos para animaciones y el formato de impresión -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.8/index.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
     <style>
-        .animate-fade-in {
-            animation: fadeIn 0.3s ease-in-out;
+        * { font-family: 'Inter', system-ui, sans-serif; }
+        
+        @media print {
+            body * { visibility: hidden; }
+            #print-modal, #print-modal * { visibility: visible; }
+            #print-modal {
+                position: absolute;
+                left: 0; top: 0;
+                width: 100%; height: 100%;
+                background: white;
+            }
+            .no-print { display: none !important; }
         }
+        
+        .tab-content { display: none; animation: fadeIn 0.3s ease; }
+        .tab-content.active { display: block; }
+        
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(5px); }
+            from { opacity: 0; transform: translateY(8px); }
             to { opacity: 1; transform: translateY(0); }
         }
-
-        /* Estilos de impresión para el Vale de Salida */
-        @media print {
-            body * {
-                visibility: hidden;
-            }
-            #receipt-modal, #receipt-modal * {
-                visibility: visible;
-            }
-            #receipt-modal {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-                padding: 20px;
-                background-color: white !important;
-                box-shadow: none !important;
-            }
-            .no-print {
-                display: none !important;
-            }
+        
+        @keyframes slideIn {
+            from { transform: translateX(120%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(120%); opacity: 0; }
+        }
+        
+        .toast-enter { animation: slideIn 0.3s ease forwards; }
+        .toast-exit { animation: slideOut 0.3s ease forwards; }
+        
+        .sidebar-btn { position: relative; overflow: hidden; }
+        .sidebar-btn::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 0;
+            width: 3px; height: 100%;
+            background: #10b981;
+            transform: scaleY(0);
+            transition: transform 0.2s;
+        }
+        .sidebar-btn.active::before { transform: scaleY(1); }
+        
+        .card-hover { transition: all 0.2s ease; }
+        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.08); }
+        
+        input:focus, select:focus { border-color: #10b981 !important; }
+        
+        .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+        .scrollbar-thin::-webkit-scrollbar-track { background: #f1f5f9; }
+        .scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        
+        .badge-pulse { animation: pulse 2s infinite; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
+        .gradient-header {
+            background: linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%);
         }
     </style>
 </head>
-<body class="bg-slate-50 font-sans text-slate-800">
+<body class="bg-gray-100 h-screen flex overflow-hidden">
 
-    <div class="min-h-screen flex flex-col md:flex-row">
+    <!-- Menú Lateral -->
+    <aside class="w-64 bg-gray-900 text-white flex flex-col h-full shadow-2xl z-20 flex-shrink-0">
+        <div class="p-6 text-center border-b border-gray-800">
+            <div class="inline-flex items-center justify-center w-14 h-14 bg-emerald-600/20 rounded-2xl mb-3">
+                <i class="fa-solid fa-truck-fast text-emerald-400 text-2xl"></i>
+            </div>
+            <h1 class="text-lg font-bold tracking-wider">SISTEMA EGO PRO</h1>
+            <p class="text-xs text-gray-500 mt-1">Control de Almacén v2.0</p>
+        </div>
+        <nav class="flex-1 p-4 space-y-1 overflow-y-auto scrollbar-thin">
+            <button onclick="showTab('dashboard')" id="btn-dashboard" class="sidebar-btn active w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-all duration-200 bg-emerald-600 text-white">
+                <i class="fa-solid fa-chart-pie w-5"></i><span class="text-sm font-medium">Dashboard</span>
+            </button>
+            <button onclick="showTab('inventario')" id="btn-inventario" class="sidebar-btn w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left text-gray-400 hover:bg-gray-800 hover:text-white transition-all duration-200">
+                <i class="fa-solid fa-boxes-stacked w-5"></i><span class="text-sm font-medium">Inventario</span>
+            </button>
+            <button onclick="showTab('entradas')" id="btn-entradas" class="sidebar-btn w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left text-gray-400 hover:bg-gray-800 hover:text-white transition-all duration-200">
+                <i class="fa-solid fa-arrow-right-to-bracket w-5"></i><span class="text-sm font-medium">Entradas</span>
+            </button>
+            <button onclick="showTab('salidas')" id="btn-salidas" class="sidebar-btn w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left text-gray-400 hover:bg-gray-800 hover:text-white transition-all duration-200">
+                <i class="fa-solid fa-truck-ramp-box w-5"></i><span class="text-sm font-medium">Salidas</span>
+            </button>
+            <button onclick="showTab('historial')" id="btn-historial" class="sidebar-btn w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left text-gray-400 hover:bg-gray-800 hover:text-white transition-all duration-200">
+                <i class="fa-solid fa-clock-rotate-left w-5"></i><span class="text-sm font-medium">Historial</span>
+            </button>
+            <div class="pt-4 mt-4 border-t border-gray-800">
+                <button onclick="showTab('configuracion')" id="btn-configuracion" class="sidebar-btn w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left text-gray-400 hover:bg-gray-800 hover:text-white transition-all duration-200">
+                    <i class="fa-solid fa-gear w-5"></i><span class="text-sm font-medium">Configuración</span>
+                </button>
+            </div>
+        </nav>
+        <div class="p-4 border-t border-gray-800">
+            <div class="flex items-center space-x-3 px-2">
+                <div class="w-8 h-8 bg-emerald-600 rounded-full flex items-center justify-center text-xs font-bold">AD</div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs font-medium truncate">Administrador</p>
+                    <p class="text-xs text-gray-500">Almacén Central</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Contenido Principal -->
+    <main class="flex-1 h-full overflow-y-auto bg-gray-50 p-6 lg:p-8 scrollbar-thin">
         
-        <!-- Sidebar Navigation -->
-        <aside class="w-full md:w-64 bg-gray-900 text-gray-300 flex flex-col shrink-0 no-print shadow-xl z-10">
-            <div class="p-6 border-b border-gray-800">
-                <h1 class="text-xl font-bold text-white flex items-center">
-                    <i class="ph-fill ph-package text-emerald-500 mr-2 text-2xl"></i>
-                    Sistema de Almacén
-                </h1>
+        <!-- DASHBOARD -->
+        <div id="dashboard" class="tab-content active">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-800">Panel de Control</h2>
+                    <p class="text-sm text-gray-500 mt-1" id="dash-greeting">Bienvenido al sistema de gestión</p>
+                </div>
+                <div class="flex items-center space-x-2 text-sm text-gray-500 bg-white px-4 py-2 rounded-lg border">
+                    <i class="fa-regular fa-calendar"></i>
+                    <span id="dash-date"></span>
+                </div>
             </div>
-            <nav class="flex-1 py-4">
-                <ul class="space-y-1 px-3">
-                    <li>
-                        <button onclick="navigate('dashboard')" id="nav-dashboard" class="nav-btn w-full flex items-center px-4 py-3 rounded-lg transition-all duration-300">
-                            <i class="ph ph-squares-four mr-3 text-xl"></i> Dashboard
-                        </button>
-                    </li>
-                    <li>
-                        <button onclick="navigate('inventory')" id="nav-inventory" class="nav-btn w-full flex items-center px-4 py-3 rounded-lg transition-all duration-300">
-                            <i class="ph ph-magnifying-glass mr-3 text-xl"></i> Inventario
-                        </button>
-                    </li>
-                    <li>
-                        <button onclick="navigate('in')" id="nav-in" class="nav-btn w-full flex items-center px-4 py-3 rounded-lg transition-all duration-300">
-                            <i class="ph ph-download-simple mr-3 text-xl"></i> Entradas
-                        </button>
-                    </li>
-                    <li>
-                        <button onclick="navigate('out')" id="nav-out" class="nav-btn w-full flex items-center px-4 py-3 rounded-lg transition-all duration-300">
-                            <i class="ph ph-upload-simple mr-3 text-xl"></i> Salidas
-                        </button>
-                    </li>
-                </ul>
-            </nav>
-        </aside>
-
-        <!-- Main Content Area -->
-        <main class="flex-1 p-6 md:p-8 overflow-y-auto no-print relative">
-            <!-- Toast Notification -->
-            <div id="toast" class="hidden absolute top-4 right-8 bg-blue-50 border border-blue-200 text-blue-700 p-4 rounded-lg flex items-center shadow-md animate-fade-in z-50">
-                <i class="ph-fill ph-warning mr-2 text-xl"></i>
-                <span id="toast-message">Mensaje</span>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 card-hover">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="p-2.5 bg-blue-100 text-blue-600 rounded-lg"><i class="fa-solid fa-cubes"></i></div>
+                        <span class="text-xs text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded-full" id="dash-items-trend">Catálogo</span>
+                    </div>
+                    <p class="text-2xl font-bold text-gray-800" id="dash-total-items">0</p>
+                    <p class="text-xs text-gray-500 mt-1">Refacciones registradas</p>
+                </div>
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 card-hover">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="p-2.5 bg-red-100 text-red-600 rounded-lg"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                        <span class="text-xs text-red-600 font-medium bg-red-50 px-2 py-0.5 rounded-full badge-pulse" id="dash-alert-badge">Alertas</span>
+                    </div>
+                    <p class="text-2xl font-bold text-gray-800" id="dash-low-stock">0</p>
+                    <p class="text-xs text-gray-500 mt-1">Stock bajo mínimo</p>
+                </div>
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 card-hover">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="p-2.5 bg-emerald-100 text-emerald-600 rounded-lg"><i class="fa-solid fa-boxes-packing"></i></div>
+                        <span class="text-xs text-gray-500 font-medium">Total</span>
+                    </div>
+                    <p class="text-2xl font-bold text-gray-800" id="dash-total-pieces">0</p>
+                    <p class="text-xs text-gray-500 mt-1">Piezas en almacén</p>
+                </div>
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 card-hover">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="p-2.5 bg-amber-100 text-amber-600 rounded-lg"><i class="fa-solid fa-right-left"></i></div>
+                        <span class="text-xs text-gray-500 font-medium">Hoy</span>
+                    </div>
+                    <p class="text-2xl font-bold text-gray-800" id="dash-today-movements">0</p>
+                    <p class="text-xs text-gray-500 mt-1">Movimientos del día</p>
+                </div>
             </div>
 
-            <div id="app-content">
-                <!-- El contenido dinámico se inyectará aquí mediante JavaScript -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-bold text-gray-800">Actividad de Movimientos</h3>
+                        <select id="chart-range" onchange="updateChart()" class="text-xs border rounded-lg px-2 py-1">
+                            <option value="7">Últimos 7 días</option>
+                            <option value="14">Últimos 14 días</option>
+                            <option value="30">Últimos 30 días</option>
+                        </select>
+                    </div>
+                    <div style="height: 260px;">
+                        <canvas id="activityChart"></canvas>
+                    </div>
+                </div>
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                    <h3 class="font-bold text-gray-800 mb-4">Distribución por Estado</h3>
+                    <div style="height: 260px;">
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
             </div>
-        </main>
+            
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="p-5 border-b flex items-center justify-between">
+                    <h3 class="font-bold text-gray-800"><i class="fa-solid fa-bell text-red-500 mr-2"></i>Alertas de Reabastecimiento</h3>
+                    <span class="text-xs text-gray-500" id="alerts-count">0 alertas</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider border-b">
+                                <th class="p-4">SKU</th>
+                                <th class="p-4">Descripción</th>
+                                <th class="p-4 text-center">Stock Actual</th>
+                                <th class="p-4 text-center">Mínimo</th>
+                                <th class="p-4 text-center">Faltante</th>
+                                <th class="p-4 text-center">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="alerts-table" class="divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
 
-        <!-- Contenedor del Vale de Salida (Oculto por defecto) -->
-        <div id="receipt-container" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
-            <div id="receipt-modal" class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
-                <!-- El contenido del recibo se inyecta aquí -->
+        <!-- INVENTARIO -->
+        <div id="inventario" class="tab-content">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-800">Catálogo e Inventario</h2>
+                    <p class="text-sm text-gray-500 mt-1">Gestiona tus refacciones y stock</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="descargarExcel()" class="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center space-x-2">
+                        <i class="fa-solid fa-file-excel text-emerald-600"></i> <span>Exportar CSV</span>
+                    </button>
+                    <button onclick="openNewPartModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center space-x-2">
+                        <i class="fa-solid fa-plus"></i> <span>Nueva Refacción</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filtros -->
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div class="relative md:col-span-2">
+                        <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                        <input type="text" id="search-inventory" oninput="updateInventarioTable()" placeholder="Buscar por SKU o descripción..." class="w-full border rounded-lg p-2 pl-9 text-sm outline-none">
+                    </div>
+                    <select id="filter-status" onchange="updateInventarioTable()" class="border rounded-lg p-2 text-sm outline-none">
+                        <option value="all">Todos los estados</option>
+                        <option value="ok">Stock óptimo</option>
+                        <option value="low">Stock bajo</option>
+                        <option value="zero">Sin stock</option>
+                    </select>
+                    <select id="sort-by" onchange="updateInventarioTable()" class="border rounded-lg p-2 text-sm outline-none">
+                        <option value="sku">Ordenar: SKU</option>
+                        <option value="desc">Ordenar: Descripción</option>
+                        <option value="stock-asc">Stock: menor a mayor</option>
+                        <option value="stock-desc">Stock: mayor a menor</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Tabla Inventario -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider border-b">
+                                <th class="p-4">SKU</th>
+                                <th class="p-4">Descripción</th>
+                                <th class="p-4">Ubicación</th>
+                                <th class="p-4 text-center">Stock</th>
+                                <th class="p-4 text-center">Mín.</th>
+                                <th class="p-4 text-center">Estado</th>
+                                <th class="p-4 text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-table" class="divide-y divide-gray-100 text-sm"></tbody>
+                    </table>
+                </div>
+                <div class="p-4 bg-gray-50 border-t text-sm text-gray-500 flex justify-between items-center">
+                    <span id="inventory-count">0 refacciones</span>
+                    <span id="inventory-total-stock">Total: 0 piezas</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ENTRADAS -->
+        <div id="entradas" class="tab-content">
+            <h2 class="text-2xl font-bold text-gray-800 mb-1">Recepción de Mercancía</h2>
+            <p class="text-sm text-gray-500 mb-6">Registra las entradas al almacén</p>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 lg:col-span-1 h-fit">
+                    <h3 class="font-bold text-gray-800 mb-4 flex items-center"><i class="fa-solid fa-plus-circle text-emerald-600 mr-2"></i>Agregar a Lista</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1 font-medium">Refacción</label>
+                            <select id="in-select" class="w-full border rounded-lg p-2.5 text-sm outline-none"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1 font-medium">Cantidad</label>
+                            <input type="number" id="in-qty" min="1" value="1" class="w-full border rounded-lg p-2.5 text-sm outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1 font-medium">Proveedor / Nota (opcional)</label>
+                            <input type="text" id="in-note" class="w-full border rounded-lg p-2.5 text-sm outline-none" placeholder="Ej. Proveedor ABC, OC #123">
+                        </div>
+                        <button onclick="addToCart('in')" class="w-full bg-gray-900 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition">
+                            <i class="fa-solid fa-plus mr-1"></i> Añadir a la lista
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-bold text-gray-800">Lista de Recepción</h3>
+                        <button onclick="clearCart('in')" class="text-xs text-red-500 hover:text-red-700"><i class="fa-solid fa-trash mr-1"></i>Vaciar</button>
+                    </div>
+                    <div class="min-h-[200px] overflow-x-auto">
+                        <table class="w-full text-left border-collapse mb-4">
+                            <thead>
+                                <tr class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider border-b">
+                                    <th class="p-2">SKU</th>
+                                    <th class="p-2">Descripción</th>
+                                    <th class="p-2 text-center">Cant.</th>
+                                    <th class="p-2 text-center">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="in-cart-table" class="divide-y divide-gray-100 text-sm"></tbody>
+                        </table>
+                    </div>
+                    <div class="border-t pt-4 flex justify-between items-center">
+                        <span class="text-sm text-gray-500" id="in-cart-total">Total: 0 piezas</span>
+                        <button onclick="processEntrada()" class="bg-emerald-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-emerald-700 transition shadow-sm">
+                            <i class="fa-solid fa-check mr-1"></i> Confirmar Entrada
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SALIDAS -->
+        <div id="salidas" class="tab-content">
+            <h2 class="text-2xl font-bold text-gray-800 mb-1">Despacho de Refacciones</h2>
+            <p class="text-sm text-gray-500 mb-6">Genera vales de salida</p>
+            
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-6">
+                <h3 class="font-bold text-gray-800 mb-4">Datos del Movimiento</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <button id="btn-tipo-interno" onclick="setTipoSalida('Interno')" class="py-3 border-2 border-emerald-600 bg-emerald-50 text-emerald-700 rounded-lg font-bold transition">
+                        <i class="fa-solid fa-truck mr-2"></i> Interno
+                    </button>
+                    <button id="btn-tipo-externo" onclick="setTipoSalida('Externo')" class="py-3 border-2 border-gray-200 text-gray-500 rounded-lg font-bold hover:bg-gray-50 transition">
+                        <i class="fa-solid fa-users mr-2"></i> Externo
+                    </button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label id="lbl-destino" class="block text-sm font-medium text-gray-700 mb-1">Unidad o Proyecto</label>
+                        <input type="text" id="out-destino" class="w-full border rounded-lg p-2.5 text-sm outline-none bg-gray-50" placeholder="Ej. Unidad 15 - Tracto...">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Solicitante</label>
+                        <input type="text" id="out-solicitante" class="w-full border rounded-lg p-2.5 text-sm outline-none bg-gray-50" placeholder="Nombre de quien recibe">
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Observaciones (opcional)</label>
+                    <input type="text" id="out-obs" class="w-full border rounded-lg p-2.5 text-sm outline-none bg-gray-50" placeholder="Notas adicionales...">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 lg:col-span-1 h-fit">
+                    <h3 class="font-bold text-gray-800 mb-4 flex items-center"><i class="fa-solid fa-cart-flatbed mr-2 text-emerald-600"></i>Surtir Refacción</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1 font-medium">Refacción</label>
+                            <select id="out-select" class="w-full border rounded-lg p-2.5 text-sm outline-none"></select>
+                            <p class="text-xs text-gray-400 mt-1" id="out-stock-info"></p>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1 font-medium">Cantidad</label>
+                            <input type="number" id="out-qty" min="1" value="1" class="w-full border rounded-lg p-2.5 text-sm outline-none">
+                        </div>
+                        <button onclick="addToCart('out')" class="w-full bg-emerald-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-emerald-700 transition">
+                            <i class="fa-solid fa-plus mr-1"></i> Añadir al Vale
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-bold text-gray-800">Vale de Salida</h3>
+                        <button onclick="clearCart('out')" class="text-xs text-red-500 hover:text-red-700"><i class="fa-solid fa-trash mr-1"></i>Vaciar</button>
+                    </div>
+                    <div class="min-h-[200px] overflow-x-auto">
+                        <table class="w-full text-left border-collapse mb-4">
+                            <thead>
+                                <tr class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider border-b">
+                                    <th class="p-2">SKU</th>
+                                    <th class="p-2">Descripción</th>
+                                    <th class="p-2 text-center">Cant.</th>
+                                    <th class="p-2 text-center">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="out-cart-table" class="divide-y divide-gray-100 text-sm"></tbody>
+                        </table>
+                    </div>
+                    <div class="border-t pt-4 flex justify-between items-center">
+                        <span class="text-sm text-gray-500" id="out-cart-total">Total: 0 piezas</span>
+                        <button onclick="processSalida()" class="bg-emerald-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-emerald-700 transition shadow-lg shadow-emerald-600/30">
+                            <i class="fa-solid fa-print mr-2"></i>Registrar e Imprimir
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- HISTORIAL -->
+        <div id="historial" class="tab-content">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-800">Historial de Movimientos</h2>
+                    <p class="text-sm text-gray-500 mt-1">Registro de todas las entradas y salidas</p>
+                </div>
+                <button onclick="exportarHistorial()" class="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center space-x-2">
+                    <i class="fa-solid fa-file-export text-emerald-600"></i> <span>Exportar</span>
+                </button>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div class="relative md:col-span-2">
+                        <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                        <input type="text" id="search-history" oninput="renderHistorial()" placeholder="Buscar por folio, SKU, destino..." class="w-full border rounded-lg p-2 pl-9 text-sm outline-none">
+                    </div>
+                    <select id="filter-type" onchange="renderHistorial()" class="border rounded-lg p-2 text-sm outline-none">
+                        <option value="all">Todos los tipos</option>
+                        <option value="entrada">Solo Entradas</option>
+                        <option value="salida">Solo Salidas</option>
+                    </select>
+                    <input type="date" id="filter-date" onchange="renderHistorial()" class="border rounded-lg p-2 text-sm outline-none">
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider border-b">
+                                <th class="p-4">Folio</th>
+                                <th class="p-4">Tipo</th>
+                                <th class="p-4">Fecha</th>
+                                <th class="p-4">Destino/Origen</th>
+                                <th class="p-4 text-center">Piezas</th>
+                                <th class="p-4">Detalle</th>
+                                <th class="p-4 text-center">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table" class="divide-y divide-gray-100 text-sm"></tbody>
+                    </table>
+                </div>
+                <div class="p-4 bg-gray-50 border-t text-sm text-gray-500" id="history-count">0 movimientos</div>
+            </div>
+        </div>
+
+        <!-- CONFIGURACIÓN -->
+        <div id="configuracion" class="tab-content">
+            <h2 class="text-2xl font-bold text-gray-800 mb-1">Configuración</h2>
+            <p class="text-sm text-gray-500 mb-6">Ajustes generales del sistema</p>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <h3 class="font-bold text-gray-800 mb-4 flex items-center"><i class="fa-solid fa-building mr-2 text-emerald-600"></i>Datos de la Empresa</h3>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1 font-medium">Nombre</label>
+                            <input type="text" id="cfg-nombre" class="w-full border rounded-lg p-2.5 text-sm outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1 font-medium">Subtítulo</label>
+                            <input type="text" id="cfg-subtitulo" class="w-full border rounded-lg p-2.5 text-sm outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <h3 class="font-bold text-gray-800 mb-4 flex items-center"><i class="fa-solid fa-sliders mr-2 text-emerald-600"></i>Parámetros</h3>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1 font-medium">Stock mínimo por defecto (nuevas refacciones)</label>
+                            <input type="number" id="cfg-min-default" min="1" class="w-full border rounded-lg p-2.5 text-sm outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1 font-medium">Prefijo de folio</label>
+                            <input type="text" id="cfg-folio-prefix" maxlength="4" class="w-full border rounded-lg p-2.5 text-sm outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 lg:col-span-2">
+                    <h3 class="font-bold text-gray-800 mb-4 flex items-center"><i class="fa-solid fa-database mr-2 text-emerald-600"></i>Respaldo de Datos</h3>
+                    <p class="text-sm text-gray-500 mb-4">Los datos se guardan automáticamente en tu navegador. Puedes exportar o restaurar un respaldo completo.</p>
+                    <div class="flex flex-wrap gap-3">
+                        <button onclick="exportBackup()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+                            <i class="fa-solid fa-download mr-1"></i> Exportar Respaldo
+                        </button>
+                        <label class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer">
+                            <i class="fa-solid fa-upload mr-1"></i> Restaurar Respaldo
+                            <input type="file" accept=".json" onchange="importBackup(event)" class="hidden">
+                        </label>
+                        <button onclick="resetAllData()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+                            <i class="fa-solid fa-trash mr-1"></i> Borrar Todo
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end">
+                <button onclick="saveConfig()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-lg font-medium transition shadow-sm">
+                    <i class="fa-solid fa-save mr-1"></i> Guardar Configuración
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal Nueva/Editar Refacción -->
+    <div id="part-modal" class="hidden fixed inset-0 z-40 bg-gray-900/60 flex justify-center items-center p-4 no-print">
+        <div class="bg-white w-full max-w-lg rounded-xl shadow-2xl">
+            <div class="p-5 border-b flex items-center justify-between">
+                <h3 class="font-bold text-gray-800" id="part-modal-title">Nueva Refacción</h3>
+                <button onclick="closePartModal()" class="text-gray-400 hover:text-gray-800"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div class="p-5 space-y-4">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1 font-medium">Código / SKU *</label>
+                        <input type="text" id="part-sku" class="w-full border rounded-lg p-2.5 text-sm outline-none" placeholder="Ej. FIL-001">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1 font-medium">Ubicación</label>
+                        <input type="text" id="part-loc" class="w-full border rounded-lg p-2.5 text-sm outline-none" placeholder="Pasillo/Anaquel">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1 font-medium">Descripción *</label>
+                    <input type="text" id="part-desc" class="w-full border rounded-lg p-2.5 text-sm outline-none" placeholder="Nombre completo de la pieza">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1 font-medium">Stock Inicial</label>
+                        <input type="number" id="part-stock" min="0" value="0" class="w-full border rounded-lg p-2.5 text-sm outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1 font-medium">Stock Mínimo</label>
+                        <input type="number" id="part-min" min="0" value="5" class="w-full border rounded-lg p-2.5 text-sm outline-none">
+                    </div>
+                </div>
+            </div>
+            <div class="p-5 border-t bg-gray-50 rounded-b-xl flex justify-end space-x-2">
+                <button onclick="closePartModal()" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-200 transition">Cancelar</button>
+                <button onclick="savePart()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">Guardar</button>
             </div>
         </div>
     </div>
 
+    <!-- Modal Detalle Historial -->
+    <div id="detail-modal" class="hidden fixed inset-0 z-40 bg-gray-900/60 flex justify-center items-center p-4 no-print">
+        <div class="bg-white w-full max-w-2xl rounded-xl shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="p-5 border-b flex items-center justify-between sticky top-0 bg-white">
+                <h3 class="font-bold text-gray-800">Detalle del Movimiento</h3>
+                <button onclick="document.getElementById('detail-modal').classList.add('hidden')" class="text-gray-400 hover:text-gray-800"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div id="detail-content" class="p-5"></div>
+        </div>
+    </div>
+
+    <!-- Modal Confirmación -->
+    <div id="confirm-modal" class="hidden fixed inset-0 z-50 bg-gray-900/60 flex justify-center items-center p-4 no-print">
+        <div class="bg-white w-full max-w-sm rounded-xl shadow-2xl">
+            <div class="p-6 text-center">
+                <div id="confirm-icon" class="w-14 h-14 mx-auto bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-4">
+                    <i class="fa-solid fa-triangle-exclamation text-2xl"></i>
+                </div>
+                <h3 id="confirm-title" class="font-bold text-gray-800 text-lg mb-2">¿Estás seguro?</h3>
+                <p id="confirm-msg" class="text-sm text-gray-500 mb-6">Esta acción no se puede deshacer.</p>
+                <div class="flex space-x-2">
+                    <button onclick="closeConfirm()" class="flex-1 px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition">Cancelar</button>
+                    <button id="confirm-ok" class="flex-1 px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition">Confirmar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Imprimir Vale de Salida -->
+    <div id="print-modal" class="hidden fixed inset-0 z-50 bg-gray-900/80 flex justify-center items-start pt-8 overflow-y-auto no-print">
+        <div class="bg-white w-full max-w-[800px] p-6 lg:p-10 rounded-xl shadow-2xl relative mb-10">
+            <button onclick="closePrintModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-800 no-print">
+                <i class="fa-solid fa-xmark text-2xl"></i>
+            </button>
+            
+            <div class="border-2 border-gray-800 p-6 lg:p-8">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b-2 border-gray-800 pb-4 mb-6 gap-4">
+                    <div>
+                        <h1 class="text-2xl lg:text-3xl font-bold text-gray-900 uppercase tracking-widest" id="print-empresa">SISTEMA EGO PRO</h1>
+                        <p class="text-gray-600 text-sm" id="print-subtitulo">Control Logístico de Almacén</p>
+                    </div>
+                    <div class="text-left sm:text-right">
+                        <h2 class="text-xl lg:text-2xl font-bold text-gray-800">VALE DE SALIDA</h2>
+                        <p class="text-gray-500 text-sm" id="print-fecha">Fecha: --</p>
+                        <p class="font-bold text-gray-800 mt-1">Folio: <span id="print-folio">0000</span></p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-gray-100 p-4 mb-6 border border-gray-300">
+                    <div>
+                        <p class="text-xs text-gray-500 uppercase font-bold">Tipo:</p>
+                        <p class="text-base font-bold text-gray-900" id="print-tipo">--</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500 uppercase font-bold" id="print-destino-lbl">Destino:</p>
+                        <p class="text-base font-bold text-gray-900" id="print-destino">--</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500 uppercase font-bold">Solicitante:</p>
+                        <p class="text-base font-bold text-gray-900" id="print-solicitante">--</p>
+                    </div>
+                </div>
+
+                <table class="w-full text-left border-collapse border border-gray-300 mb-8">
+                    <thead>
+                        <tr class="bg-gray-200 text-gray-800 text-sm border-b border-gray-300">
+                            <th class="p-3 border-r border-gray-300">CÓDIGO</th>
+                            <th class="p-3 border-r border-gray-300">DESCRIPCIÓN</th>
+                            <th class="p-3 text-center border-r border-gray-300">UBICACIÓN</th>
+                            <th class="p-3 text-center">CANTIDAD</th>
+                        </tr>
+                    </thead>
+                    <tbody id="print-items" class="text-sm"></tbody>
+                </table>
+
+                <div id="print-obs-container" class="hidden mb-8 p-3 bg-gray-50 border border-gray-200 rounded">
+                    <p class="text-xs text-gray-500 uppercase font-bold mb-1">Observaciones:</p>
+                    <p class="text-sm text-gray-800" id="print-obs"></p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-8 mt-16">
+                    <div class="text-center">
+                        <div class="border-t border-gray-800 pt-2">
+                            <p class="font-bold text-gray-800 text-sm">Entregó (Almacén)</p>
+                            <p class="text-xs text-gray-500">Nombre y Firma</p>
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <div class="border-t border-gray-800 pt-2">
+                            <p class="font-bold text-gray-800 text-sm">Recibió</p>
+                            <p class="text-xs text-gray-500">Nombre y Firma</p>
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <div class="border-t border-gray-800 pt-2">
+                            <p class="font-bold text-gray-800 text-sm">Vo.Bo. Supervisor</p>
+                            <p class="text-xs text-gray-500">Nombre y Firma</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 flex flex-wrap justify-center gap-3 no-print">
+                <button onclick="window.print()" class="bg-gray-900 text-white px-6 py-2.5 rounded-lg font-bold hover:bg-gray-800 shadow-lg transition">
+                    <i class="fa-solid fa-print mr-2"></i>Imprimir
+                </button>
+                <button onclick="closePrintModal()" class="bg-white border border-gray-300 text-gray-700 px-6 py-2.5 rounded-lg font-bold hover:bg-gray-50 transition">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-[100] space-y-2 pointer-events-none"></div>
+
     <script>
-        // --- ESTADO INICIAL (Datos de prueba) ---
-        let parts = [
-            { id: 'p1', sku: 'FIL-001', name: 'Filtro de Aceite Sintético', location: 'Pasillo 1, Anaquel A1', minStock: 10 },
-            { id: 'p2', sku: 'BAL-023', name: 'Balatas Delanteras', location: 'Pasillo 2, Anaquel B3', minStock: 5 },
-            { id: 'p3', sku: 'BUJ-009', name: 'Bujía de Iridio', location: 'Pasillo 1, Anaquel C2', minStock: 20 },
-            { id: 'p4', sku: 'BAN-104', name: 'Banda de Distribución', location: 'Pasillo 3, Anaquel A1', minStock: 3 },
-        ];
+        // ============ ESTADO ============
+        const STORAGE_KEY = 'ego_pro_data_v2';
+        
+        let state = {
+            inventario: [
+                { sku: 'FIL-001', desc: 'Filtro de Aceite Diésel', loc: 'Pasillo A - Nivel 2', stock: 24, min: 10 },
+                { sku: 'BAL-002', desc: 'Balatas Delanteras HD', loc: 'Pasillo B - Nivel 1', stock: 8, min: 15 },
+                { sku: 'LUB-003', desc: 'Aceite Sintético 15W-40 (Litro)', loc: 'Anaquel C', stock: 45, min: 20 },
+                { sku: 'FAR-004', desc: 'Foco Halógeno H4', loc: 'Mostrador', stock: 3, min: 10 },
+                { sku: 'COR-005', desc: 'Correa de Distribución', loc: 'Pasillo A - Nivel 3', stock: 12, min: 5 },
+                { sku: 'ROD-006', desc: 'Rodamiento de Rueda', loc: 'Pasillo C - Nivel 1', stock: 0, min: 8 }
+            ],
+            historial: [],
+            config: {
+                nombre: 'SISTEMA EGO PRO',
+                subtitulo: 'Control Logístico de Almacén',
+                minDefault: 5,
+                folioPrefix: 'VP',
+                folioActual: 1001
+            }
+        };
 
-        let transactions = [
-            { id: 't1', date: '2023-10-24T10:00:00', partId: 'p1', type: 'IN', qty: 50, reference: 'Factura 1092' },
-            { id: 't2', date: '2023-10-25T11:30:00', partId: 'p2', type: 'IN', qty: 20, reference: 'Factura 1093' },
-            { id: 't3', date: '2023-10-26T09:15:00', partId: 'p3', type: 'IN', qty: 100, reference: 'Factura 1094' },
-            { id: 't4', date: '2023-10-26T14:00:00', partId: 'p1', type: 'OUT', qty: 4, reference: 'Unidad 45 (Mantenimiento)' },
-            { id: 't5', date: '2023-10-27T08:30:00', partId: 'p2', type: 'OUT', qty: 16, reference: 'Unidad 12 (Reparación)' },
-        ];
+        let cartIn = [];
+        let cartOut = [];
+        let tipoSalida = 'Interno';
+        let editingSku = null;
+        let activityChart = null;
+        let statusChart = null;
 
-        let activeTab = 'dashboard';
-        let searchTerm = '';
-        let receiptData = null;
-
-        // --- LÓGICA CENTRAL ---
-
-        // Función para calcular el inventario actual basado en las transacciones
-        function getInventoryStatus() {
-            return parts.map(part => {
-                const partTransactions = transactions.filter(t => t.partId === part.id);
-                const currentStock = partTransactions.reduce((total, t) => {
-                    return t.type === 'IN' ? total + t.qty : total - t.qty;
-                }, 0);
-                
-                return {
-                    ...part,
-                    currentStock,
-                    status: currentStock <= part.minStock ? 'low' : 'ok'
-                };
-            });
+        // ============ PERSISTENCIA ============
+        function saveState() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            } catch(e) { console.warn('No se pudo guardar', e); }
         }
 
-        // Mostrar notificaciones en pantalla
-        function showFeedback(msg) {
-            const toast = document.getElementById('toast');
-            const toastMsg = document.getElementById('toast-message');
-            toastMsg.textContent = msg;
-            toast.classList.remove('hidden');
-            
+        function loadState() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    state = { ...state, ...parsed };
+                    if (parsed.config) state.config = { ...state.config, ...parsed.config };
+                }
+            } catch(e) { console.warn('No se pudo cargar', e); }
+        }
+
+        // ============ TOAST ============
+        function toast(msg, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const colors = {
+                success: 'bg-emerald-600',
+                error: 'bg-red-600',
+                warning: 'bg-amber-500',
+                info: 'bg-blue-600'
+            };
+            const icons = {
+                success: 'fa-circle-check',
+                error: 'fa-circle-xmark',
+                warning: 'fa-triangle-exclamation',
+                info: 'fa-circle-info'
+            };
+            const el = document.createElement('div');
+            el.className = `toast-enter pointer-events-auto ${colors[type]} text-white px-4 py-3 rounded-lg shadow-lg flex items-center space-x-3 min-w-[280px] max-w-md`;
+            el.innerHTML = `<i class="fa-solid ${icons[type]}"></i><span class="text-sm font-medium flex-1">${msg}</span>`;
+            container.appendChild(el);
             setTimeout(() => {
-                toast.classList.add('hidden');
+                el.classList.remove('toast-enter');
+                el.classList.add('toast-exit');
+                setTimeout(() => el.remove(), 300);
             }, 3000);
         }
 
-        // Navegación entre pestañas
-        function navigate(tab) {
-            activeTab = tab;
-            
-            // Actualizar clases de los botones del menú lateral
-            document.querySelectorAll('.nav-btn').forEach(btn => {
-                btn.className = 'nav-btn w-full flex items-center px-4 py-3 rounded-lg transition-all duration-300 hover:bg-gray-800 hover:text-white';
-            });
-            
-            const activeBtn = document.getElementById(`nav-${tab}`);
-            if (activeBtn) {
-                activeBtn.className = 'nav-btn w-full flex items-center px-4 py-3 rounded-lg transition-all duration-300 bg-emerald-600 text-white shadow-lg shadow-emerald-600/40';
+        // ============ CONFIRM ============
+        function confirmAction(title, msg, onOk, danger = true) {
+            document.getElementById('confirm-title').innerText = title;
+            document.getElementById('confirm-msg').innerText = msg;
+            const icon = document.getElementById('confirm-icon');
+            const btn = document.getElementById('confirm-ok');
+            if (danger) {
+                icon.className = 'w-14 h-14 mx-auto bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4';
+                icon.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-2xl"></i>';
+                btn.className = 'flex-1 px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition';
+            } else {
+                icon.className = 'w-14 h-14 mx-auto bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-4';
+                icon.innerHTML = '<i class="fa-solid fa-check text-2xl"></i>';
+                btn.className = 'flex-1 px-4 py-2 rounded-lg text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition';
             }
-
-            renderContent();
+            btn.onclick = () => { closeConfirm(); onOk(); };
+            document.getElementById('confirm-modal').classList.remove('hidden');
+        }
+        function closeConfirm() {
+            document.getElementById('confirm-modal').classList.add('hidden');
         }
 
-        // Exportar a CSV (Excel)
-        function handleExportCSV() {
-            const inventory = getInventoryStatus();
-            const headers = ['SKU', 'Descripción', 'Ubicación', 'Stock Mínimo', 'Stock Actual', 'Estado'];
+        // ============ NAVEGACIÓN ============
+        function showTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
             
-            const csvRows = inventory.map(item => [
-                item.sku,
-                `"${item.name}"`, 
-                `"${item.location}"`,
-                item.minStock,
-                item.currentStock,
-                item.status === 'ok' ? 'Óptimo' : 'Bajo'
-            ]);
+            document.querySelectorAll('.sidebar-btn').forEach(btn => {
+                btn.className = 'sidebar-btn w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left text-gray-400 hover:bg-gray-800 hover:text-white transition-all duration-200';
+            });
+            const activeBtn = document.getElementById('btn-' + tabId);
+            activeBtn.className = 'sidebar-btn active w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-all duration-200 bg-emerald-600 text-white';
             
-            const csvContent = "\uFEFF" + [headers.join(','), ...csvRows.map(row => row.join(','))].join('\n');
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            const url = URL.createObjectURL(blob);
+            if (tabId === 'dashboard') setTimeout(updateCharts, 50);
+            if (tabId === 'historial') renderHistorial();
+            if (tabId === 'configuracion') loadConfigForm();
+        }
+
+        // ============ DASHBOARD ============
+        function updateDashboard() {
+            document.getElementById('dash-total-items').innerText = state.inventario.length;
             
-            link.setAttribute('href', url);
-            link.setAttribute('download', `Inventario_Almacen_${new Date().toISOString().split('T')[0]}.csv`);
+            let totalPieces = 0, lowStockCount = 0, alertsHtml = '';
+            state.inventario.forEach(item => {
+                totalPieces += item.stock;
+                if (item.stock <= item.min) {
+                    lowStockCount++;
+                    const faltante = Math.max(0, item.min - item.stock);
+                    alertsHtml += `
+                        <tr class="text-sm hover:bg-gray-50">
+                            <td class="p-4 font-medium">${item.sku}</td>
+                            <td class="p-4 text-gray-600">${item.desc}</td>
+                            <td class="p-4 text-center"><span class="bg-red-100 text-red-700 px-2 py-1 rounded-md font-bold">${item.stock}</span></td>
+                            <td class="p-4 text-center text-gray-500">${item.min}</td>
+                            <td class="p-4 text-center"><span class="text-amber-700 font-bold">${faltante}</span></td>
+                            <td class="p-4 text-center">
+                                <button onclick="quickRestock('${item.sku}')" class="text-xs bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-2 py-1 rounded border border-emerald-200">
+                                    <i class="fa-solid fa-plus mr-1"></i>Reabastecer
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }
+            });
+
+            // Movimientos de hoy
+            const hoy = new Date().toISOString().split('T')[0];
+            const movHoy = state.historial.filter(h => h.fecha && h.fecha.startsWith(hoy)).length;
+
+            document.getElementById('dash-total-pieces').innerText = totalPieces;
+            document.getElementById('dash-low-stock').innerText = lowStockCount;
+            document.getElementById('dash-today-movements').innerText = movHoy;
+            document.getElementById('alerts-count').innerText = `${lowStockCount} alertas`;
+            document.getElementById('alerts-table').innerHTML = alertsHtml || '<tr><td colspan="6" class="p-6 text-center text-gray-500"><i class="fa-solid fa-circle-check text-emerald-500 text-2xl mb-2"></i><br>Todo el stock está en niveles óptimos</td></tr>';
+
+            // Fecha
+            const fecha = new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            document.getElementById('dash-date').innerText = fecha.charAt(0).toUpperCase() + fecha.slice(1);
+        }
+
+        function quickRestock(sku) {
+            showTab('entradas');
+            setTimeout(() => {
+                document.getElementById('in-select').value = sku;
+                document.getElementById('in-qty').focus();
+            }, 100);
+        }
+
+        // ============ GRÁFICOS ============
+        function updateCharts() {
+            updateActivityChart();
+            updateStatusChart();
+        }
+
+        function updateChart() { updateActivityChart(); }
+
+        function updateActivityChart() {
+            const days = parseInt(document.getElementById('chart-range').value);
+            const labels = [];
+            const entradas = [];
+            const salidas = [];
+            
+            for (let i = days - 1; i >= 0; i--) {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                const key = d.toISOString().split('T')[0];
+                labels.push(d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }));
+                
+                const ent = state.historial.filter(h => h.tipo === 'entrada' && h.fecha && h.fecha.startsWith(key));
+                const sal = state.historial.filter(h => h.tipo === 'salida' && h.fecha && h.fecha.startsWith(key));
+                entradas.push(ent.reduce((s, h) => s + (h.totalPiezas || 0), 0));
+                salidas.push(sal.reduce((s, h) => s + (h.totalPiezas || 0), 0));
+            }
+
+            const ctx = document.getElementById('activityChart').getContext('2d');
+            if (activityChart) activityChart.destroy();
+            activityChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        { label: 'Entradas', data: entradas, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', tension: 0.4, fill: true, borderWidth: 2 },
+                        { label: 'Salidas', data: salidas, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', tension: 0.4, fill: true, borderWidth: 2 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8 } } },
+                    scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+                }
+            });
+        }
+
+        function updateStatusChart() {
+            let opt = 0, bajo = 0, sin = 0;
+            state.inventario.forEach(i => {
+                if (i.stock === 0) sin++;
+                else if (i.stock <= i.min) bajo++;
+                else opt++;
+            });
+            const ctx = document.getElementById('statusChart').getContext('2d');
+            if (statusChart) statusChart.destroy();
+            statusChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Óptimo', 'Bajo', 'Sin Stock'],
+                    datasets: [{
+                        data: [opt, bajo, sin],
+                        backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, cutout: '65%',
+                    plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, padding: 15 } } }
+                }
+            });
+        }
+
+        // ============ INVENTARIO ============
+        function updateInventarioTable() {
+            const search = document.getElementById('search-inventory').value.toLowerCase();
+            const statusFilter = document.getElementById('filter-status').value;
+            const sortBy = document.getElementById('sort-by').value;
+
+            let filtered = state.inventario.filter(item => {
+                const matchSearch = item.sku.toLowerCase().includes(search) || item.desc.toLowerCase().includes(search);
+                let matchStatus = true;
+                if (statusFilter === 'ok') matchStatus = item.stock > item.min;
+                else if (statusFilter === 'low') matchStatus = item.stock > 0 && item.stock <= item.min;
+                else if (statusFilter === 'zero') matchStatus = item.stock === 0;
+                return matchSearch && matchStatus;
+            });
+
+            filtered.sort((a, b) => {
+                if (sortBy === 'sku') return a.sku.localeCompare(b.sku);
+                if (sortBy === 'desc') return a.desc.localeCompare(b.desc);
+                if (sortBy === 'stock-asc') return a.stock - b.stock;
+                if (sortBy === 'stock-desc') return b.stock - a.stock;
+                return 0;
+            });
+
+            let html = '', totalStock = 0;
+            filtered.forEach(item => {
+                totalStock += item.stock;
+                let statusBadge;
+                if (item.stock === 0) statusBadge = '<span class="text-red-700 bg-red-50 px-2 py-1 rounded-md text-xs font-bold border border-red-200">SIN STOCK</span>';
+                else if (item.stock <= item.min) statusBadge = '<span class="text-amber-700 bg-amber-50 px-2 py-1 rounded-md text-xs font-bold border border-amber-200">BAJO</span>';
+                else statusBadge = '<span class="text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md text-xs font-bold border border-emerald-200">ÓPTIMO</span>';
+                
+                html += `
+                    <tr class="hover:bg-gray-50">
+                        <td class="p-4 font-medium text-gray-800 font-mono text-xs">${item.sku}</td>
+                        <td class="p-4 text-gray-600">${item.desc}</td>
+                        <td class="p-4 text-gray-500 text-xs"><i class="fa-solid fa-location-dot mr-1"></i>${item.loc}</td>
+                        <td class="p-4 text-center font-bold text-gray-800">${item.stock}</td>
+                        <td class="p-4 text-center text-gray-500">${item.min}</td>
+                        <td class="p-4 text-center">${statusBadge}</td>
+                        <td class="p-4 text-center">
+                            <div class="flex justify-center space-x-1">
+                                <button onclick="editPart('${item.sku}')" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Editar"><i class="fa-solid fa-pen text-xs"></i></button>
+                                <button onclick="deletePart('${item.sku}')" class="p-1.5 text-red-600 hover:bg-red-50 rounded" title="Eliminar"><i class="fa-solid fa-trash text-xs"></i></button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+            document.getElementById('inventory-table').innerHTML = html || '<tr><td colspan="7" class="p-6 text-center text-gray-500">No se encontraron refacciones</td></tr>';
+            document.getElementById('inventory-count').innerText = `${filtered.length} refacciones`;
+            document.getElementById('inventory-total-stock').innerText = `Total: ${totalStock} piezas`;
+        }
+
+        function openNewPartModal() {
+            editingSku = null;
+            document.getElementById('part-modal-title').innerText = 'Nueva Refacción';
+            document.getElementById('part-sku').value = '';
+            document.getElementById('part-sku').disabled = false;
+            document.getElementById('part-desc').value = '';
+            document.getElementById('part-loc').value = '';
+            document.getElementById('part-stock').value = '0';
+            document.getElementById('part-min').value = state.config.minDefault;
+            document.getElementById('part-modal').classList.remove('hidden');
+        }
+
+        function editPart(sku) {
+            const item = state.inventario.find(i => i.sku === sku);
+            if (!item) return;
+            editingSku = sku;
+            document.getElementById('part-modal-title').innerText = 'Editar Refacción';
+            document.getElementById('part-sku').value = item.sku;
+            document.getElementById('part-sku').disabled = true;
+            document.getElementById('part-desc').value = item.desc;
+            document.getElementById('part-loc').value = item.loc;
+            document.getElementById('part-stock').value = item.stock;
+            document.getElementById('part-min').value = item.min;
+            document.getElementById('part-modal').classList.remove('hidden');
+        }
+
+        function closePartModal() {
+            document.getElementById('part-modal').classList.add('hidden');
+        }
+
+        function savePart() {
+            const sku = document.getElementById('part-sku').value.trim().toUpperCase();
+            const desc = document.getElementById('part-desc').value.trim();
+            const loc = document.getElementById('part-loc').value.trim();
+            const stock = parseInt(document.getElementById('part-stock').value) || 0;
+            const min = parseInt(document.getElementById('part-min').value) || 0;
+
+            if (!sku || !desc) { toast('SKU y Descripción son obligatorios', 'error'); return; }
+
+            if (editingSku) {
+                const item = state.inventario.find(i => i.sku === editingSku);
+                item.desc = desc; item.loc = loc || 'Sin asignar'; item.stock = stock; item.min = min;
+                toast('Refacción actualizada', 'success');
+            } else {
+                if (state.inventario.find(i => i.sku === sku)) { toast('Ese SKU ya existe', 'error'); return; }
+                state.inventario.push({ sku, desc, loc: loc || 'Sin asignar', stock, min });
+                toast('Refacción creada', 'success');
+            }
+            saveState();
+            closePartModal();
+            refreshAll();
+        }
+
+        function deletePart(sku) {
+            confirmAction('Eliminar Refacción', `¿Eliminar "${sku}" del inventario? Esta acción no se puede deshacer.`, () => {
+                state.inventario = state.inventario.filter(i => i.sku !== sku);
+                saveState();
+                refreshAll();
+                toast('Refacción eliminada', 'success');
+            });
+        }
+
+        // ============ SELECTS ============
+        function updateSelects() {
+            let html = '<option value="">-- Seleccione una refacción --</option>';
+            state.inventario.forEach(item => {
+                html += `<option value="${item.sku}">${item.sku} - ${item.desc} (Stock: ${item.stock})</option>`;
+            });
+            document.getElementById('in-select').innerHTML = html;
+            document.getElementById('out-select').innerHTML = html;
+            
+            // Info stock en salidas
+            document.getElementById('out-select').addEventListener('change', function() {
+                const item = state.inventario.find(i => i.sku === this.value);
+                const info = document.getElementById('out-stock-info');
+                if (item) {
+                    info.innerHTML = `Stock disponible: <strong class="${item.stock === 0 ? 'text-red-600' : item.stock <= item.min ? 'text-amber-600' : 'text-emerald-600'}">${item.stock}</strong> | Mín: ${item.min}`;
+                } else info.innerHTML = '';
+            });
+        }
+
+        // ============ CARRITOS ============
+        function addToCart(type) {
+            const selectId = type === 'in' ? 'in-select' : 'out-select';
+            const qtyId = type === 'in' ? 'in-qty' : 'out-qty';
+            const cart = type === 'in' ? cartIn : cartOut;
+
+            const sku = document.getElementById(selectId).value;
+            const qty = parseInt(document.getElementById(qtyId).value);
+
+            if (!sku || isNaN(qty) || qty <= 0) { toast('Seleccione artículo y cantidad válida', 'error'); return; }
+
+            const item = state.inventario.find(i => i.sku === sku);
+            if (type === 'out' && qty > item.stock) { toast(`Stock insuficiente. Disponible: ${item.stock}`, 'error'); return; }
+
+            const existing = cart.find(i => i.sku === sku);
+            if (existing) {
+                const newQty = existing.qty + qty;
+                if (type === 'out' && newQty > item.stock) { toast(`No puedes exceder el stock (${item.stock})`, 'error'); return; }
+                existing.qty = newQty;
+            } else {
+                cart.push({ sku: item.sku, desc: item.desc, qty, loc: item.loc });
+            }
+
+            document.getElementById(selectId).value = '';
+            document.getElementById(qtyId).value = '1';
+            renderCart(type);
+            toast(`${qty}x ${item.sku} agregado`, 'info');
+        }
+
+        function removeFromCart(type, index) {
+            const cart = type === 'in' ? cartIn : cartOut;
+            cart.splice(index, 1);
+            renderCart(type);
+        }
+
+        function clearCart(type) {
+            const cart = type === 'in' ? cartIn : cartOut;
+            if (cart.length === 0) return;
+            confirmAction('Vaciar lista', '¿Eliminar todos los artículos de la lista?', () => {
+                if (type === 'in') cartIn = []; else cartOut = [];
+                renderCart(type);
+            }, true);
+        }
+
+        function renderCart(type) {
+            const cart = type === 'in' ? cartIn : cartOut;
+            const tableId = type === 'in' ? 'in-cart-table' : 'out-cart-table';
+            const totalId = type === 'in' ? 'in-cart-total' : 'out-cart-total';
+            
+            let html = '', totalQty = 0;
+            cart.forEach((item, index) => {
+                totalQty += item.qty;
+                html += `
+                    <tr>
+                        <td class="p-2 font-medium font-mono text-xs">${item.sku}</td>
+                        <td class="p-2 text-gray-600">${item.desc}</td>
+                        <td class="p-2 text-center font-bold">${item.qty}</td>
+                        <td class="p-2 text-center">
+                            <button onclick="removeFromCart('${type}', ${index})" class="text-red-500 hover:text-red-700 p-1"><i class="fa-solid fa-trash text-xs"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+            document.getElementById(tableId).innerHTML = html || '<tr><td colspan="4" class="p-6 text-center text-gray-400">Lista vacía</td></tr>';
+            document.getElementById(totalId).innerText = `Total: ${totalQty} piezas`;
+        }
+
+        // ============ ENTRADAS ============
+        function processEntrada() {
+            if (cartIn.length === 0) { toast('La lista está vacía', 'error'); return; }
+            const note = document.getElementById('in-note').value.trim();
+            
+            let totalPiezas = 0;
+            const items = cartIn.map(ci => {
+                totalPiezas += ci.qty;
+                const inv = state.inventario.find(i => i.sku === ci.sku);
+                inv.stock += ci.qty;
+                return { ...ci };
+            });
+
+            state.historial.unshift({
+                id: Date.now(),
+                tipo: 'entrada',
+                folio: 'E-' + Date.now().toString().slice(-6),
+                fecha: new Date().toISOString(),
+                destino: note || 'Reabastecimiento general',
+                solicitante: 'Almacén',
+                items,
+                totalPiezas,
+                obs: note
+            });
+
+            saveState();
+            cartIn = [];
+            document.getElementById('in-note').value = '';
+            renderCart('in');
+            refreshAll();
+            toast(`Entrada registrada: ${totalPiezas} piezas`, 'success');
+        }
+
+        // ============ SALIDAS ============
+        function setTipoSalida(tipo) {
+            tipoSalida = tipo;
+            const btnInt = document.getElementById('btn-tipo-interno');
+            const btnExt = document.getElementById('btn-tipo-externo');
+            const lblDest = document.getElementById('lbl-destino');
+            const inputDest = document.getElementById('out-destino');
+
+            if (tipo === 'Interno') {
+                btnInt.className = "py-3 border-2 border-emerald-600 bg-emerald-50 text-emerald-700 rounded-lg font-bold transition";
+                btnExt.className = "py-3 border-2 border-gray-200 text-gray-500 rounded-lg font-bold hover:bg-gray-50 transition";
+                lblDest.innerText = "Unidad o Proyecto";
+                inputDest.placeholder = "Ej. Unidad 15 - Tracto...";
+            } else {
+                btnExt.className = "py-3 border-2 border-emerald-600 bg-emerald-50 text-emerald-700 rounded-lg font-bold transition";
+                btnInt.className = "py-3 border-2 border-gray-200 text-gray-500 rounded-lg font-bold hover:bg-gray-50 transition";
+                lblDest.innerText = "Cliente o N° de Orden";
+                inputDest.placeholder = "Ej. Taller Externo Rodríguez...";
+            }
+        }
+
+        function processSalida() {
+            if (cartOut.length === 0) { toast('La lista está vacía', 'error'); return; }
+            const destino = document.getElementById('out-destino').value.trim();
+            const solicitante = document.getElementById('out-solicitante').value.trim();
+            const obs = document.getElementById('out-obs').value.trim();
+            
+            if (!destino) { toast('Especifique el destino', 'error'); return; }
+            if (!solicitante) { toast('Especifique el solicitante', 'error'); return; }
+
+            const folio = state.config.folioPrefix + '-' + state.config.folioActual.toString().padStart(4, '0');
+            const fechaActual = new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            
+            document.getElementById('print-empresa').innerText = state.config.nombre;
+            document.getElementById('print-subtitulo').innerText = state.config.subtitulo;
+            document.getElementById('print-fecha').innerText = `Fecha: ${fechaActual}`;
+            document.getElementById('print-folio').innerText = folio;
+            document.getElementById('print-tipo').innerText = tipoSalida;
+            document.getElementById('print-destino-lbl').innerText = tipoSalida === 'Interno' ? 'Unidad / Proyecto:' : 'Cliente:';
+            document.getElementById('print-destino').innerText = destino;
+            document.getElementById('print-solicitante').innerText = solicitante;
+
+            if (obs) {
+                document.getElementById('print-obs-container').classList.remove('hidden');
+                document.getElementById('print-obs').innerText = obs;
+            } else {
+                document.getElementById('print-obs-container').classList.add('hidden');
+            }
+
+            let itemsHtml = '', totalPiezas = 0;
+            const items = [];
+            cartOut.forEach(item => {
+                const inv = state.inventario.find(i => i.sku === item.sku);
+                inv.stock -= item.qty;
+                totalPiezas += item.qty;
+                items.push({ ...item });
+                itemsHtml += `
+                    <tr class="border-b border-gray-300">
+                        <td class="p-3 border-r border-gray-300 font-bold font-mono text-xs">${item.sku}</td>
+                        <td class="p-3 border-r border-gray-300">${item.desc}</td>
+                        <td class="p-3 text-center border-r border-gray-300 text-xs">${item.loc}</td>
+                        <td class="p-3 text-center font-bold text-lg">${item.qty}</td>
+                    </tr>
+                `;
+            });
+
+            document.getElementById('print-items').innerHTML = itemsHtml;
+            document.getElementById('print-modal').classList.remove('hidden');
+
+            state.historial.unshift({
+                id: Date.now(),
+                tipo: 'salida',
+                folio,
+                fecha: new Date().toISOString(),
+                destino,
+                solicitante,
+                tipoMovimiento: tipoSalida,
+                items,
+                totalPiezas,
+                obs
+            });
+
+            state.config.folioActual++;
+            saveState();
+            
+            cartOut = [];
+            document.getElementById('out-destino').value = '';
+            document.getElementById('out-solicitante').value = '';
+            document.getElementById('out-obs').value = '';
+            renderCart('out');
+            refreshAll();
+            toast(`Vale ${folio} generado`, 'success');
+        }
+
+        function closePrintModal() {
+            document.getElementById('print-modal').classList.add('hidden');
+        }
+
+        // ============ HISTORIAL ============
+        function renderHistorial() {
+            const search = document.getElementById('search-history').value.toLowerCase();
+            const typeFilter = document.getElementById('filter-type').value;
+            const dateFilter = document.getElementById('filter-date').value;
+
+            let filtered = state.historial.filter(h => {
+                const matchSearch = !search || 
+                    h.folio.toLowerCase().includes(search) ||
+                    h.destino.toLowerCase().includes(search) ||
+                    (h.solicitante && h.solicitante.toLowerCase().includes(search)) ||
+                    h.items.some(i => i.sku.toLowerCase().includes(search) || i.desc.toLowerCase().includes(search));
+                const matchType = typeFilter === 'all' || h.tipo === typeFilter;
+                const matchDate = !dateFilter || (h.fecha && h.fecha.startsWith(dateFilter));
+                return matchSearch && matchType && matchDate;
+            });
+
+            let html = '';
+            filtered.forEach(h => {
+                const fecha = new Date(h.fecha).toLocaleString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                const badge = h.tipo === 'entrada' 
+                    ? '<span class="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md text-xs font-bold">ENTRADA</span>'
+                    : '<span class="bg-red-100 text-red-700 px-2 py-1 rounded-md text-xs font-bold">SALIDA</span>';
+                
+                html += `
+                    <tr class="hover:bg-gray-50">
+                        <td class="p-4 font-mono text-xs font-bold">${h.folio}</td>
+                        <td class="p-4">${badge}</td>
+                        <td class="p-4 text-gray-600 text-xs">${fecha}</td>
+                        <td class="p-4 text-gray-800">${h.destino}</td>
+                        <td class="p-4 text-center font-bold">${h.totalPiezas}</td>
+                        <td class="p-4 text-xs text-gray-500">${h.items.length} artículos</td>
+                        <td class="p-4 text-center">
+                            <button onclick="viewDetail(${h.id})" class="text-blue-600 hover:bg-blue-50 p-1.5 rounded" title="Ver detalle"><i class="fa-solid fa-eye text-xs"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+            document.getElementById('history-table').innerHTML = html || '<tr><td colspan="7" class="p-6 text-center text-gray-500">No hay movimientos registrados</td></tr>';
+            document.getElementById('history-count').innerText = `${filtered.length} movimientos`;
+        }
+
+        function viewDetail(id) {
+            const h = state.historial.find(x => x.id === id);
+            if (!h) return;
+            const fecha = new Date(h.fecha).toLocaleString('es-MX');
+            let itemsHtml = h.items.map(i => `
+                <tr class="border-b">
+                    <td class="p-2 font-mono text-xs">${i.sku}</td>
+                    <td class="p-2">${i.desc}</td>
+                    <td class="p-2 text-center font-bold">${i.qty}</td>
+                </tr>
+            `).join('');
+            
+            document.getElementById('detail-content').innerHTML = `
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div><p class="text-xs text-gray-500">Folio</p><p class="font-bold">${h.folio}</p></div>
+                    <div><p class="text-xs text-gray-500">Fecha</p><p class="font-bold">${fecha}</p></div>
+                    <div><p class="text-xs text-gray-500">Tipo</p><p class="font-bold capitalize">${h.tipo}</p></div>
+                    <div><p class="text-xs text-gray-500">Destino</p><p class="font-bold">${h.destino}</p></div>
+                    <div><p class="text-xs text-gray-500">Solicitante</p><p class="font-bold">${h.solicitante || '-'}</p></div>
+                    <div><p class="text-xs text-gray-500">Total Piezas</p><p class="font-bold">${h.totalPiezas}</p></div>
+                </div>
+                ${h.obs ? `<div class="mb-4 p-3 bg-gray-50 rounded"><p class="text-xs text-gray-500">Observaciones</p><p class="text-sm">${h.obs}</p></div>` : ''}
+                <table class="w-full text-sm border-collapse border">
+                    <thead><tr class="bg-gray-100"><th class="p-2 border">SKU</th><th class="p-2 border">Descripción</th><th class="p-2 border">Cant.</th></tr></thead>
+                    <tbody>${itemsHtml}</tbody>
+                </table>
+            `;
+            document.getElementById('detail-modal').classList.remove('hidden');
+        }
+
+        function exportarHistorial() {
+            if (state.historial.length === 0) { toast('No hay historial para exportar', 'warning'); return; }
+            let csv = "\uFEFFFolio,Tipo,Fecha,Destino,Solicitante,Total Piezas,Observaciones,Detalle Items\n";
+            state.historial.forEach(h => {
+                const detalle = h.items.map(i => `${i.sku}(${i.qty})`).join('; ');
+                csv += `${h.folio},${h.tipo},"${new Date(h.fecha).toLocaleString('es-MX')}","${h.destino}","${h.solicitante || ''}",${h.totalPiezas},"${h.obs || ''}","${detalle}"\n`;
+            });
+            downloadCSV(csv, `Historial_EGO_PRO_${new Date().toISOString().split('T')[0]}.csv`);
+            toast('Historial exportado', 'success');
+        }
+
+        // ============ EXPORTAR INVENTARIO ============
+        function descargarExcel() {
+            let csv = "\uFEFFCódigo SKU,Descripción,Ubicación,Stock Actual,Stock Mínimo,Estado\n";
+            state.inventario.forEach(row => {
+                let status = row.stock === 0 ? "Sin Stock" : row.stock <= row.min ? "Bajo" : "Óptimo";
+                csv += `${row.sku},"${row.desc}","${row.loc}",${row.stock},${row.min},${status}\n`;
+            });
+            downloadCSV(csv, `Inventario_EGO_PRO_${new Date().toISOString().split('T')[0]}.csv`);
+            toast('Inventario exportado', 'success');
+        }
+
+        function downloadCSV(content, filename) {
+            const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.setAttribute("href", URL.createObjectURL(blob));
+            link.setAttribute("download", filename);
             link.style.visibility = 'hidden';
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            
-            showFeedback('Hoja de cálculo generada y descargada exitosamente.');
         }
 
-        // Agregar nueva refacción
-        function handleAddPart(event) {
-            event.preventDefault();
-            const sku = document.getElementById('new-sku').value;
-            const name = document.getElementById('new-name').value;
-            const location = document.getElementById('new-location').value;
-            const minStock = document.getElementById('new-min-stock').value;
-
-            if (!sku || !name) return;
-
-            parts.push({
-                id: 'p' + Date.now(),
-                sku,
-                name,
-                location,
-                minStock: parseInt(minStock) || 0
-            });
-
-            showFeedback('Refacción agregada al catálogo exitosamente.');
-            renderContent(); // Recargar la vista
+        // ============ CONFIGURACIÓN ============
+        function loadConfigForm() {
+            document.getElementById('cfg-nombre').value = state.config.nombre;
+            document.getElementById('cfg-subtitulo').value = state.config.subtitulo;
+            document.getElementById('cfg-min-default').value = state.config.minDefault;
+            document.getElementById('cfg-folio-prefix').value = state.config.folioPrefix;
         }
 
-        // Búsqueda en el inventario
-        function handleSearch(event) {
-            searchTerm = event.target.value.toLowerCase();
-            renderContent(); // Podría optimizarse, pero para piloto está bien
+        function saveConfig() {
+            state.config.nombre = document.getElementById('cfg-nombre').value.trim() || 'SISTEMA EGO PRO';
+            state.config.subtitulo = document.getElementById('cfg-subtitulo').value.trim() || 'Control de Almacén';
+            state.config.minDefault = parseInt(document.getElementById('cfg-min-default').value) || 5;
+            state.config.folioPrefix = document.getElementById('cfg-folio-prefix').value.trim().toUpperCase() || 'VP';
+            saveState();
+            toast('Configuración guardada', 'success');
         }
 
-        // Registrar Transacción (Entrada/Salida)
-        function handleTransaction(event, type) {
-            event.preventDefault();
-            const partId = document.getElementById('trans-part').value;
-            const qtyInput = document.getElementById('trans-qty').value;
-            const reference = document.getElementById('trans-ref').value;
+        function exportBackup() {
+            const data = JSON.stringify(state, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `Respaldo_EGO_PRO_${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+            toast('Respaldo exportado', 'success');
+        }
 
-            if (!partId || !qtyInput) return;
-
-            const qty = parseInt(qtyInput);
-            if (qty <= 0) {
-                showFeedback('La cantidad debe ser mayor a 0.');
-                return;
-            }
-
-            const inventory = getInventoryStatus();
-            const partStatus = inventory.find(p => p.id === partId);
-
-            if (type === 'OUT') {
-                if (partStatus && partStatus.currentStock < qty) {
-                    showFeedback('Error: No hay suficiente stock para esta salida.');
-                    return;
+        function importBackup(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    confirmAction('Restaurar respaldo', 'Esto reemplazará todos los datos actuales. ¿Continuar?', () => {
+                        state = { ...state, ...data };
+                        if (data.config) state.config = { ...state.config, ...data.config };
+                        saveState();
+                        refreshAll();
+                        toast('Respaldo restaurado', 'success');
+                    }, false);
+                } catch(err) {
+                    toast('Archivo inválido', 'error');
                 }
-            }
-
-            const transaction = {
-                id: 't' + Date.now(),
-                date: new Date().toISOString(),
-                partId: partId,
-                type: type,
-                qty: qty,
-                reference: reference
             };
-
-            transactions.push(transaction);
-            
-            if (type === 'IN') {
-                showFeedback('Entrada registrada exitosamente.');
-                navigate('in'); // Limpiar formulario
-            } else {
-                showFeedback('Salida registrada exitosamente.');
-                // Preparar e imprimir recibo
-                receiptData = {
-                    ...transaction,
-                    partSku: partStatus.sku,
-                    partName: partStatus.name
-                };
-                renderReceiptModal();
-            }
+            reader.readAsText(file);
+            event.target.value = '';
         }
 
-        // --- FUNCIONES DE RENDERIZADO (Dibujar en pantalla) ---
-
-        function renderDashboard() {
-            const inventory = getInventoryStatus();
-            const lowStockItems = inventory.filter(item => item.status === 'low');
-            const totalIn = transactions.filter(t => t.type === 'IN').length;
-            const totalOut = transactions.filter(t => t.type === 'OUT').length;
-
-            let lowStockHtml = '';
-            if (lowStockItems.length === 0) {
-                lowStockHtml = `<p class="text-slate-500 text-sm">Todo el inventario está en niveles óptimos.</p>`;
-            } else {
-                let rows = lowStockItems.map(item => `
-                    <tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                        <td class="py-3 font-medium text-slate-700">${item.sku}</td>
-                        <td class="py-3 text-slate-600">${item.name}</td>
-                        <td class="py-3 text-slate-500 text-xs flex items-center">
-                            <i class="ph ph-map-pin mr-1"></i>${item.location}
-                        </td>
-                        <td class="py-3 text-right font-bold text-rose-600">${item.currentStock}</td>
-                        <td class="py-3 text-right text-slate-500">${item.minStock}</td>
-                    </tr>
-                `).join('');
-
-                lowStockHtml = `
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse">
-                            <thead>
-                                <tr class="border-b border-slate-200 text-sm text-slate-500">
-                                    <th class="pb-3 font-medium">SKU</th>
-                                    <th class="pb-3 font-medium">Refacción</th>
-                                    <th class="pb-3 font-medium">Ubicación</th>
-                                    <th class="pb-3 font-medium text-right">Stock Actual</th>
-                                    <th class="pb-3 font-medium text-right">Mínimo</th>
-                                </tr>
-                            </thead>
-                            <tbody class="text-sm">${rows}</tbody>
-                        </table>
-                    </div>
-                `;
-            }
-
-            return `
-                <div class="space-y-6 animate-fade-in">
-                    <h2 class="text-2xl font-bold text-slate-800">Resumen Operativo</h2>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center space-x-4">
-                            <div class="p-3 bg-blue-100 text-blue-600 rounded-lg"><i class="ph ph-package text-2xl"></i></div>
-                            <div>
-                                <p class="text-sm text-slate-500 font-medium">Total SKUs</p>
-                                <p class="text-2xl font-bold text-slate-800">${parts.length}</p>
-                            </div>
-                        </div>
-                        
-                        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center space-x-4">
-                            <div class="p-3 bg-emerald-100 text-emerald-600 rounded-lg"><i class="ph ph-download-simple text-2xl"></i></div>
-                            <div>
-                                <p class="text-sm text-slate-500 font-medium">Entradas Registradas</p>
-                                <p class="text-2xl font-bold text-slate-800">${totalIn}</p>
-                            </div>
-                        </div>
-
-                        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center space-x-4">
-                            <div class="p-3 bg-rose-100 text-rose-600 rounded-lg"><i class="ph ph-upload-simple text-2xl"></i></div>
-                            <div>
-                                <p class="text-sm text-slate-500 font-medium">Salidas Registradas</p>
-                                <p class="text-2xl font-bold text-slate-800">${totalOut}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
-                        <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center">
-                            <i class="ph-fill ph-warning text-amber-500 mr-2 text-xl"></i>
-                            Alertas de Stock Bajo
-                        </h3>
-                        ${lowStockHtml}
-                    </div>
-                </div>
-            `;
+        function resetAllData() {
+            confirmAction('Borrar todos los datos', 'Se eliminarán TODAS las refacciones, historial y configuración. Esta acción es irreversible.', () => {
+                localStorage.removeItem(STORAGE_KEY);
+                location.reload();
+            });
         }
 
-        function renderInventory() {
-            const inventory = getInventoryStatus();
-            const filteredInventory = inventory.filter(item => 
-                item.name.toLowerCase().includes(searchTerm) || 
-                item.sku.toLowerCase().includes(searchTerm)
-            );
-
-            let rows = filteredInventory.map(item => `
-                <tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
-                    <td class="p-4 font-medium text-slate-800">${item.sku}</td>
-                    <td class="p-4 text-slate-600">${item.name}</td>
-                    <td class="p-4 text-slate-500">${item.location}</td>
-                    <td class="p-4 text-right text-slate-500">${item.minStock}</td>
-                    <td class="p-4 text-right font-bold text-slate-800">${item.currentStock}</td>
-                    <td class="p-4 text-center">
-                        <span class="inline-block px-2 py-1 rounded-full text-xs font-medium ${
-                            item.status === 'ok' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
-                        }">
-                            ${item.status === 'ok' ? 'Óptimo' : 'Bajo'}
-                        </span>
-                    </td>
-                </tr>
-            `).join('');
-
-            if (filteredInventory.length === 0) {
-                rows = `<tr><td colSpan="6" class="p-8 text-center text-slate-500">No se encontraron refacciones.</td></tr>`;
-            }
-
-            return `
-                <div class="space-y-6 animate-fade-in">
-                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                        <h2 class="text-2xl font-bold text-slate-800">Catálogo e Inventario</h2>
-                        <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                            <div class="relative w-full sm:w-64">
-                                <i class="ph ph-magnifying-glass absolute left-3 top-3 text-slate-400"></i>
-                                <input type="text" placeholder="Buscar pieza o SKU..." value="${searchTerm}" onkeyup="handleSearch(event)"
-                                    class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all" />
-                            </div>
-                            <button onclick="handleExportCSV()" class="flex items-center justify-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors font-medium text-sm shadow-sm whitespace-nowrap">
-                                <i class="ph ph-file-csv mr-2 text-lg"></i> Descargar Excel
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left border-collapse">
-                                <thead class="bg-slate-50">
-                                    <tr class="border-b border-slate-200 text-sm text-slate-600">
-                                        <th class="p-4 font-medium">SKU</th>
-                                        <th class="p-4 font-medium">Descripción</th>
-                                        <th class="p-4 font-medium">Ubicación</th>
-                                        <th class="p-4 font-medium text-right">Mínimo</th>
-                                        <th class="p-4 font-medium text-right">Stock Actual</th>
-                                        <th class="p-4 font-medium text-center">Estado</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="text-sm">${rows}</tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 mt-8">
-                        <h3 class="text-lg font-semibold text-slate-800 mb-4 flex items-center">
-                            <i class="ph-bold ph-plus text-blue-500 mr-2 text-xl"></i> Registrar Nueva Refacción
-                        </h3>
-                        <form onsubmit="handleAddPart(event)" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div>
-                                <label class="block text-xs font-medium text-slate-500 mb-1">SKU / Código</label>
-                                <input required id="new-sku" type="text" class="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ej. LUB-001" />
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium text-slate-500 mb-1">Descripción</label>
-                                <input required id="new-name" type="text" class="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="Nombre de la pieza" />
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium text-slate-500 mb-1">Ubicación Física</label>
-                                <input id="new-location" type="text" class="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="Pasillo, Anaquel..." />
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium text-slate-500 mb-1">Stock Mínimo</label>
-                                <input required id="new-min-stock" type="number" min="0" class="w-full p-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ej. 5" />
-                            </div>
-                            <div class="lg:col-span-4 flex justify-end mt-2">
-                                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
-                                    Agregar al Catálogo
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            `;
+        // ============ REFRESH ============
+        function refreshAll() {
+            updateDashboard();
+            updateInventarioTable();
+            updateSelects();
+            renderCart('in');
+            renderCart('out');
+            if (document.getElementById('dashboard').classList.contains('active')) updateCharts();
+            if (document.getElementById('historial').classList.contains('active')) renderHistorial();
         }
 
-        function renderTransactionForm(type) {
-            const isOutbound = type === 'OUT';
-            const title = isOutbound ? 'Salida de Refacciones (Consumo)' : 'Entrada de Refacciones (Suministro)';
-            const icon = isOutbound ? '<i class="ph-bold ph-upload-simple text-rose-500 mr-2"></i>' : '<i class="ph-bold ph-download-simple text-emerald-500 mr-2"></i>';
-            const btnColor = isOutbound ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-600 hover:bg-emerald-700';
-            const inventory = getInventoryStatus();
-
-            let options = inventory.map(item => 
-                `<option value="${item.id}">${item.sku} - ${item.name} (Stock: ${item.currentStock})</option>`
-            ).join('');
-
-            return `
-                <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-sm border border-slate-100 p-6 md:p-8 animate-fade-in">
-                    <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center">
-                        ${icon} ${title}
-                    </h2>
-                    
-                    <form onsubmit="handleTransaction(event, '${type}')" class="space-y-5">
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-1">Seleccionar Refacción</label>
-                            <select required id="trans-part" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white">
-                                <option value="">-- Seleccione una pieza --</option>
-                                ${options}
-                            </select>
-                        </div>
-
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">Cantidad</label>
-                                <input required id="trans-qty" type="number" min="1" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="0" />
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-slate-700 mb-1">
-                                    ${isOutbound ? 'Asignado a (Unidad/Proyecto)' : 'Referencia (Factura/Proveedor)'}
-                                </label>
-                                <input required id="trans-ref" type="text" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="${isOutbound ? 'Ej. Camión 45' : 'Ej. Factura A-123'}" />
-                            </div>
-                        </div>
-
-                        <div class="pt-4 border-t border-slate-100">
-                            <button type="submit" class="w-full text-white px-6 py-3 rounded-lg font-medium transition-colors ${btnColor}">
-                                Registrar ${isOutbound ? 'Salida' : 'Entrada'}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            `;
+        // ============ INIT ============
+        function init() {
+            loadState();
+            refreshAll();
+            loadConfigForm();
         }
 
-        function closeReceipt() {
-            receiptData = null;
-            document.getElementById('receipt-container').classList.add('hidden');
-            navigate('out'); // Recargar la vista de salidas para limpiar
-        }
-
-        function renderReceiptModal() {
-            if (!receiptData) return;
-
-            const dateObj = new Date(receiptData.date);
-            const formattedDate = dateObj.toLocaleDateString('es-MX') + ' ' + dateObj.toLocaleTimeString('es-MX', {hour: '2-digit', minute:'2-digit'});
-            
-            const modalHtml = `
-                <div class="p-8 bg-white overflow-y-auto">
-                    <div class="text-center mb-8 border-b-2 border-slate-800 pb-6">
-                        <h2 class="text-2xl font-black text-slate-800 uppercase tracking-widest">Vale de Salida</h2>
-                        <p class="text-slate-500 text-sm mt-2">Folio de Operación: <span class="font-bold text-slate-700">${receiptData.id}</span></p>
-                        <p class="text-slate-500 text-sm">Fecha: <span class="font-medium text-slate-700">${formattedDate}</span></p>
-                    </div>
-
-                    <div class="space-y-4 mb-10">
-                        <div class="flex justify-between items-end border-b border-slate-200 pb-2">
-                            <span class="text-slate-500 text-sm uppercase tracking-wider font-semibold">SKU / Código</span>
-                            <span class="text-slate-800 font-bold">${receiptData.partSku}</span>
-                        </div>
-                        <div class="flex justify-between items-end border-b border-slate-200 pb-2">
-                            <span class="text-slate-500 text-sm uppercase tracking-wider font-semibold">Descripción</span>
-                            <span class="text-slate-800 text-right max-w-[60%]">${receiptData.partName}</span>
-                        </div>
-                        <div class="flex justify-between items-end border-b border-slate-200 pb-2">
-                            <span class="text-slate-500 text-sm uppercase tracking-wider font-semibold">Cantidad Despachada</span>
-                            <span class="text-2xl font-black text-slate-800">${receiptData.qty} <span class="text-sm font-normal text-slate-500">unidades</span></span>
-                        </div>
-                        <div class="flex justify-between items-end border-b border-slate-200 pb-2">
-                            <span class="text-slate-500 text-sm uppercase tracking-wider font-semibold">Asignado a / Destino</span>
-                            <span class="text-slate-800 font-medium text-right max-w-[60%] bg-slate-100 px-2 py-1 rounded">${receiptData.reference}</span>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-8 mt-16 pt-4">
-                        <div class="text-center">
-                            <div class="border-b border-slate-800 h-10 mb-2"></div>
-                            <p class="text-xs text-slate-600 font-bold uppercase tracking-wider">Entregó (Almacén)</p>
-                            <p class="text-xs text-slate-400 mt-1">Nombre y Firma</p>
-                        </div>
-                        <div class="text-center">
-                            <div class="border-b border-slate-800 h-10 mb-2"></div>
-                            <p class="text-xs text-slate-600 font-bold uppercase tracking-wider">Recibió de Conformidad</p>
-                            <p class="text-xs text-slate-400 mt-1">Nombre y Firma</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-slate-50 p-4 flex justify-end space-x-3 border-t border-slate-200 no-print shrink-0">
-                    <button onclick="closeReceipt()" class="px-5 py-2.5 text-slate-600 font-medium hover:bg-slate-200 rounded-lg transition-colors">
-                        Cerrar y Continuar
-                    </button>
-                    <button onclick="window.print()" class="px-5 py-2.5 bg-slate-800 text-white font-medium hover:bg-slate-900 rounded-lg flex items-center shadow-md hover:shadow-lg transition-all">
-                        <i class="ph ph-printer mr-2 text-lg"></i> Imprimir Formato
-                    </button>
-                </div>
-            `;
-
-            document.getElementById('receipt-modal').innerHTML = modalHtml;
-            document.getElementById('receipt-container').classList.remove('hidden');
-        }
-
-        function renderContent() {
-            const container = document.getElementById('app-content');
-            
-            if (activeTab === 'dashboard') {
-                container.innerHTML = renderDashboard();
-            } else if (activeTab === 'inventory') {
-                container.innerHTML = renderInventory();
-            } else if (activeTab === 'in') {
-                container.innerHTML = renderTransactionForm('IN');
-            } else if (activeTab === 'out') {
-                container.innerHTML = renderTransactionForm('OUT');
-            }
-        }
-
-        // --- INICIALIZACIÓN ---
-        // Cargar vista inicial
-        navigate('dashboard');
-
+        init();
     </script>
 </body>
 </html>
+
